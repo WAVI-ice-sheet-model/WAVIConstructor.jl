@@ -1,0 +1,4 @@
+name = "WAVIConstructor"
+authors = ["Rosie Williams", "Thomas Zwagerman"]
+version = "0.1.0"
+description = "Pre-processing library for WAVI.jl, including data loaders and domain setup."
