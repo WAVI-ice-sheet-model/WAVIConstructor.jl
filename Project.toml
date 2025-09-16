@@ -1,4 +1,10 @@
 name = "WAVIConstructor"
-authors = ["Rosie Williams", "Thomas Zwagerman"]
+uuid = "4e0ae7ac-a5f3-419a-825d-d47dd6bf0df5"
+authors = ["Thomas Zwagerman <thozwa@bas.ac.uk>"]
 version = "0.1.0"
-description = "Pre-processing library for WAVI.jl, including data loaders and domain setup."
+
+[deps]
+NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+
+[compat]
+NCDatasets = "0.14.8"
