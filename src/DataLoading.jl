@@ -106,5 +106,57 @@ function get_bedmachine(filename::String)
     return bed, x, y, geoid, mask, thickness, surface, firn
 end
 
-end # module
 
+"""
+    get_bisicles_temps(fname_start::String; scale_xy::Real=1)
+
+Load temperature and coordinate data from a BISICLES NetCDF file.
+
+# Arguments
+- `fname_start::String`: Path to the NetCDF file containing BISICLES temperature data
+- `scale_xy::Real=1`: Scaling factor to apply to x and y coordinates (e.g., 1000 to convert km to m)
+
+# Returns
+A tuple containing:
+- `bisicles_sigma`: Sigma coordinate values
+- `bisicles_x`: X coordinate values (scaled by `scale_xy`)
+- `bisicles_y`: Y coordinate values (scaled by `scale_xy`)
+- `bisicles_z`: Z coordinate values
+- `bisicles_temps`: Temperature data
+
+# Throws
+- `ArgumentError`: If the specified file does not exist
+
+# Example
+```julia
+sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc")
+sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", scale_xy=1000)  # Convert km to m
+sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", scale_xy=0.001)  # Convert m to km
+```
+"""
+function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
+    # Validate input filename
+    if !isfile(fname_start)
+        throw(ArgumentError("File does not exist: $fname_start"))
+    end
+
+    # Use try-finally to ensure file is always closed
+    ds = NCDataset(fname_start)
+    try
+        # Helper function to read and optionally scale data
+        read_data(varname, scale_factor=1) = scale_factor .* ds[varname][:]
+
+        # Read data from NetCDF file
+        bisicles_sigma = read_data("sigma")
+        bisicles_temps = read_data("T")
+        bisicles_x = read_data("x", scale_xy)
+        bisicles_y = read_data("y", scale_xy)
+        bisicles_z = read_data("z")
+
+        return bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps
+    finally
+        close(ds)
+    end
+end
+
+end # module
