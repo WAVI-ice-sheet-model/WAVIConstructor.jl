@@ -159,4 +159,43 @@ function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
     end
 end
 
+"""
+    get_measures_velocities(filename::String)
+
+Load velocity data from a NetCDF file.
+
+# Arguments
+- `filename::String`: Path to the NetCDF file containing velocity data
+
+# Returns
+A tuple containing:
+- `xx_v`: 2D grid of x coordinates
+- `yy_v`: 2D grid of y coordinates  
+- `VX`: X-component velocity data
+- `VY`: Y-component velocity data
+
+# Example
+```julia
+xx, yy, vx, vy = get_measures_velocities("Antarctic_ice_velocity_2016_2017_1km_v01.nc")
+```
+"""
+function get_measures_velocities(filename::String)
+    ds = NCDataset(filename)
+    try
+        # Read coordinate and velocity data
+        Measures_x = ds["x"][:]
+        Measures_y = ds["y"][:]
+        VX = ds["VX"][:]
+        VY = ds["VY"][:]
+        
+        # Create coordinate grids (equivalent to MATLAB's ndgrid)
+        xx_v = repeat(Measures_x, 1, length(Measures_y))
+        yy_v = repeat(Measures_y', length(Measures_x), 1)
+
+        return xx_v, yy_v, VX, VY
+    finally
+        close(ds)
+    end
+end
+
 end # module
