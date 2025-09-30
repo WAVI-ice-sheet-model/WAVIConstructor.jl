@@ -8,6 +8,14 @@ Pre-processing library for [WAVI.jl](https://github.com/WAVI-ice-sheet-model/WAV
 
 This package is a WIP, but will support the reading and pre-processing of input data, and preparing a WAVI domain.
 
+## Installation
+
+You can install the latest version of `WAVIConstructor` using Julia's in-built package manager:
+```julia
+using Pkg
+Pkg.add(PackageSpec(url="https://github.com/WAVI-ice-sheet-model/WAVIConstructor.jl.git", rev = "main"))
+```
+
 ## Supported Input Datasets
 
 This package supports loading and processing the following datasets (readers provided in `WAVIConstructor.DataLoading`):
