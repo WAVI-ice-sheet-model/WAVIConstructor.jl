@@ -10,8 +10,14 @@ This package is a WIP, but will support the reading and pre-processing of input 
 
 ## Supported Input Datasets
 
-This package supports loading and processing the following datasets:
+This package supports loading and processing the following datasets (readers provided in `WAVIConstructor.DataLoading`):
 
-- **ALBMAP**.
-- **BedMachine Antarctica v3**.
+- **ALBMAP** (NetCDF): Antarctic ice sheet surface elevation, bed topography, firn thickness, mean annual temperature, and accumulation rate fields (`get_albmap`).
 
+- **BedMachine Antarctica v3** (NetCDF): Bed topography, ice surface elevation, ice thickness, geoid height, and ice/ocean/land mask (`get_bedmachine`).
+
+- **BISICLES Temperature Data** (NetCDF): 3D temperature fields from BISICLES ice sheet model simulations, including sigma coordinates and spatial grids (`get_bisicles_temps`).
+
+- **MEASUREs Ice Velocity** (NetCDF): NASA MEASUREs program ice velocity products providing annual ice motion vectors (VX, VY) across Antarctic and Greenland ice sheets(`get_measures_velocities`).
+
+- **Smith et al. 2020 Elevation Change** (GeoTIFF): Ice surface elevation change (dh/dt) datasets from Smith et al. 2020 study, ice sheet mass change derived from ICESat/ICESat-2(`get_smith_dhdt`).
