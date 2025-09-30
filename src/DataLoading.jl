@@ -3,7 +3,7 @@ module DataLoading
 using ArchGDAL
 using NCDatasets
 
-export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only
+export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt
 
 
 """
