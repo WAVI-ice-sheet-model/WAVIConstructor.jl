@@ -220,7 +220,7 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
         # Get basic image info
         width = ArchGDAL.width(dataset)
         height = ArchGDAL.height(dataset)
-        bands = ArchGDAL.nband(dataset)
+        bands = ArchGDAL.nraster(dataset)
         
         # Get geotransform information using GDAL standard
         gt = ArchGDAL.getgeotransform(dataset)
