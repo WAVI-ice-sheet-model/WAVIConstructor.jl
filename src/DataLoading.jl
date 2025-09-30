@@ -125,9 +125,6 @@ A tuple containing:
 - `bisicles_z`: Z coordinate values
 - `bisicles_temps`: Temperature data
 
-# Throws
-- `ArgumentError`: If the specified file does not exist
-
 # Example
 ```julia
 sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc")
@@ -136,11 +133,6 @@ sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", sc
 ```
 """
 function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
-    # Validate input filename
-    if !isfile(fname_start)
-        throw(ArgumentError("File does not exist: $fname_start"))
-    end
-
     # Use try-finally to ensure file is always closed
     ds = NCDataset(fname_start)
     try
@@ -224,11 +216,6 @@ y_coords = result.y
 ```
 """
 function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subset=nothing)
-    # Validate file exists
-    if !isfile(filename)
-        throw(ArgumentError("File does not exist: $filename"))
-    end
-
     ArchGDAL.read(filename) do dataset
         # Get basic image info
         width = ArchGDAL.width(dataset)
@@ -329,20 +316,12 @@ A tuple containing:
 - `yy`: 2D grid of y coordinates  
 - `dhdt`: Elevation/thickness change data
 
-# Throws
-- `ArgumentError`: If the specified file does not exist
-
 # Example
 ```julia
 xx, yy, dhdt = get_smith_dhdt("ais_grounded.tif")
 ```
 """
 function get_smith_dhdt(filename::String)
-    # Validate file exists
-    if !isfile(filename)
-        throw(ArgumentError("File does not exist: $filename"))
-    end
-
     # Read dhdt data
     dhdt = ArchGDAL.read(filename) do dataset
         ArchGDAL.read(dataset, 1)  # Read band 1
