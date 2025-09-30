@@ -21,3 +21,7 @@ This package supports loading and processing the following datasets (readers pro
 - **MEASUREs Ice Velocity** (NetCDF): NASA MEASUREs program ice velocity products providing annual ice motion vectors (VX, VY)(`get_measures_velocities`).
 
 - **Smith et al. 2020 Elevation Change** (GeoTIFF): Ice surface elevation change (dh/dt) datasets from Smith et al. 2020 study, ice sheet mass change derived from ICESat/ICESat-2(`get_smith_dhdt`).
+
+## Examples
+
+See the `examples/` directory for sample scripts demonstrating how to load and use the supported datasets. The main example (`examples/loading_example.jl`) shows how to read all the data files in the `Data/` directory.
