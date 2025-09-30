@@ -315,4 +315,51 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
     end
 end
 
+"""
+    get_smith_dhdt(filename::String)
+
+Load dhdt (elevation/thickness change) data from a single Smith et al. 2020 GeoTIFF file.
+
+# Arguments
+- `filename::String`: Path to the GeoTIFF file
+
+# Returns
+A tuple containing:
+- `xx`: 2D grid of x coordinates
+- `yy`: 2D grid of y coordinates  
+- `dhdt`: Elevation/thickness change data
+
+# Throws
+- `ArgumentError`: If the specified file does not exist
+
+# Example
+```julia
+xx, yy, dhdt = get_smith_dhdt("ais_grounded.tif")
+```
+"""
+function get_smith_dhdt(filename::String)
+    # Validate file exists
+    if !isfile(filename)
+        throw(ArgumentError("File does not exist: $filename"))
+    end
+
+    # Read dhdt data
+    dhdt = ArchGDAL.read(filename) do dataset
+        ArchGDAL.read(dataset, 1)  # Read band 1
+    end
+
+    # Get coordinate information
+    coord_info = geotiff_read_axis_only(filename)
+
+    # Calculate pixel center coordinates (PIXEL IS AREA, coordinate is North West corner)
+    x = [coord_info.info.map_info.mapx + coord_info.info.map_info.dx * (i - 0.5) for i in 1:coord_info.info.samples]
+    y = [coord_info.info.map_info.mapy - coord_info.info.map_info.dy * (i - 0.5) for i in 1:coord_info.info.lines]
+
+    # Create coordinate grids equivalent to MATLAB's ndgrid(flip(y), x)
+    yy = repeat(reverse(y), 1, length(x))
+    xx = repeat(x', length(y), 1)
+
+    return xx, yy, dhdt
+end
+
 end # module
