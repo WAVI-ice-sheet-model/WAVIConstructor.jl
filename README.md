@@ -18,6 +18,6 @@ This package supports loading and processing the following datasets (readers pro
 
 - **BISICLES Temperature Data** (NetCDF): 3D temperature fields from BISICLES ice sheet model simulations, including sigma coordinates and spatial grids (`get_bisicles_temps`).
 
-- **MEASUREs Ice Velocity** (NetCDF): NASA MEASUREs program ice velocity products providing annual ice motion vectors (VX, VY) across Antarctic and Greenland ice sheets(`get_measures_velocities`).
+- **MEASUREs Ice Velocity** (NetCDF): NASA MEASUREs program ice velocity products providing annual ice motion vectors (VX, VY)(`get_measures_velocities`).
 
 - **Smith et al. 2020 Elevation Change** (GeoTIFF): Ice surface elevation change (dh/dt) datasets from Smith et al. 2020 study, ice sheet mass change derived from ICESat/ICESat-2(`get_smith_dhdt`).
