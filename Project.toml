@@ -4,17 +4,19 @@ authors = ["Thomas Zwagerman <thozwa@bas.ac.uk>"]
 version = "0.1.0"
 
 [deps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 
 [compat]
+ArchGDAL = "0.10.10"
 NCDatasets = "0.14.8"
- 
+
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LiveServer = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
 docs = ["LiveServer", "Revise"]
+test = ["Test"]
