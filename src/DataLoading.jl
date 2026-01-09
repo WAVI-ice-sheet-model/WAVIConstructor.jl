@@ -5,7 +5,7 @@ using NCDatasets
 using MAT
 import DelimitedFiles: readdlm
 
-export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, load_arthern_accumulation, load_zwally_basins, load_frank_temps, load_measures_mat
+export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, get_arthern_accumulation, get_zwally_basins, get_frank_temps, get_measures_mat
 
 
 """
@@ -344,7 +344,7 @@ function get_smith_dhdt(filename::String)
 end
 
 """
-    load_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+    get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
 
 Load Arthern accumulation data from a text file.
 
@@ -366,7 +366,7 @@ A tuple containing:
 - Accumulation values are converted from water equivalent to ice equivalent (divided by 917 kg/m³)
 - Rows with NaN accumulation values are filtered out
 """
-function load_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
     # Read the file, skipping 21 header lines
     data = readdlm(filename, ' ', Float64; skipstart=21)
 
@@ -396,7 +396,7 @@ function load_arthern_accumulation(filename::String="Data/amsr_accumulation_map.
 end
 
 """
-    load_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+    get_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
 
 Load Zwally drainage basins from a MATLAB .mat file.
 
@@ -413,7 +413,7 @@ A tuple containing:
 - The .mat file should contain variables: `xxZwallyBasins`, `yyZwallyBasins`, `ZwallyBasins`
 - Only points where `ZwallyBasins > 0` are returned
 """
-function load_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+function get_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
 
     # Load the .mat file using do-block for automatic cleanup
     matopen(filename) do mat_file
@@ -434,7 +434,7 @@ function load_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.m
 end
 
 """
-    load_frank_temps(filename::String="Data/FranksTemps.mat")
+    get_frank_temps(filename::String="Data/FranksTemps.mat")
 
 Load Frank temperature data from a MATLAB .mat file.
 
@@ -452,7 +452,7 @@ A NamedTuple containing:
 - The .mat file should contain variables: `FranksTemps`, `xxTemp`, `yyTemp`, `sigmaTemp`
 - FranksTemps is a 2D array where rows represent vertical levels and columns represent spatial points
 """
-function load_frank_temps(filename::String="Data/FranksTemps.mat")
+function get_frank_temps(filename::String="Data/FranksTemps.mat")
     matopen(filename) do mat_file
         # Read the variables
         FranksTemps = read(mat_file, "FranksTemps")
@@ -470,7 +470,7 @@ function load_frank_temps(filename::String="Data/FranksTemps.mat")
 end
 
 """
-    load_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
+    get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
 
 Load MEaSUREs ice velocity data from a MATLAB .mat file.
 
@@ -488,7 +488,7 @@ A NamedTuple containing:
 - The .mat file should contain variables: `xx_v`, `yy_v`, `vx`, `vy`
 - This is the older MEaSUREs dataset format (Measures_1)
 """
-function load_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
+function get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
     matopen(filename) do mat_file
         # Read the variables
         xx_v = read(mat_file, "xx_v")
