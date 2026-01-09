@@ -12,7 +12,7 @@ using WAVI
 using WAVIConstructor.DataLoading
 
 """
-    init_bedmachine_v3(params)
+    init_bedmachine(params)
 
 Initialize computational grids and load all geophysical data using BedMachine v3.
 Julia port of the MATLAB initBedmachineV3 function.
@@ -23,7 +23,7 @@ Julia port of the MATLAB initBedmachineV3 function.
 # Returns
 Tuple of grid structures (Gh, Gu, Gv, Gc) with loaded data
 """
-function init_bedmachine_v3(params)
+function init_bedmachine(params)
     start_data = get(params, :start_data, "BEDMACHINEV3")
 
     # Load BedMachine data
@@ -68,8 +68,8 @@ function init_bedmachine_v3(params)
     domain_half_width = 2819  # Half-width in grid points
     domain_half_height = 2419  # Half-height in grid points
 
-    isub = i_pole + 2*sub_samp * (-floor(Int, (domain_half_width*2)/(2*sub_samp)):floor(Int, (domain_half_width*2)/(2*sub_samp)))
-    jsub = j_pole + 2*sub_samp * (-floor(Int, (domain_half_height*2)/(2*sub_samp)):floor(Int, (domain_half_height*2)/(2*sub_samp)))
+    isub = i_pole .+ 2*sub_samp .* (-floor(Int, (domain_half_width*2)/(2*sub_samp)):floor(Int, (domain_half_width*2)/(2*sub_samp)))
+    jsub = j_pole .+ 2*sub_samp .* (-floor(Int, (domain_half_height*2)/(2*sub_samp)):floor(Int, (domain_half_height*2)/(2*sub_samp)))
 
     # Subsample all arrays
     bed = bed[isub, jsub]
@@ -79,8 +79,8 @@ function init_bedmachine_v3(params)
     geoid = geoid[isub, jsub]
     mask = mask[isub, jsub]
 
-    x = bedmachine_x[isub]
-    y = bedmachine_y[jsub]
+    x = x_full[isub]
+    y = y_full[jsub]
 
     # Create H-grid structure
     Gh = create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
