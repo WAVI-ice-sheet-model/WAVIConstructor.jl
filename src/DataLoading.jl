@@ -135,13 +135,10 @@ sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", sc
 ```
 """
 function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
-    # Use try-finally to ensure file is always closed
     ds = NCDataset(fname_start)
     try
-        # Helper function to read and optionally scale data
         read_data(varname, scale_factor=1) = scale_factor .* ds[varname][:]
 
-        # Read data from NetCDF file
         bisicles_sigma = read_data("sigma")
         bisicles_temps = read_data("T")
         bisicles_x = read_data("x", scale_xy)
@@ -177,7 +174,6 @@ xx, yy, vx, vy = get_measures_velocities("Antarctic_ice_velocity_2016_2017_1km_v
 function get_measures_velocities(filename::String)
     ds = NCDataset(filename)
     try
-        # Read coordinate and velocity data
         Measures_x = ds["x"][:]
         Measures_y = ds["y"][:]
         VX = ds["VX"][:]
@@ -227,7 +223,6 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
         # Get geotransform information using GDAL standard
         gt = ArchGDAL.getgeotransform(dataset)
         
-        # Create a logical interface
         geotransform = (
             x_origin = gt[1],
             pixel_width = gt[2], 
@@ -235,17 +230,15 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
             pixel_height = gt[6]
         )
         
-        # Extract the specific values we need
+        # Calculate pixel width and height (x-direction resolution)
         dx = geotransform.pixel_width    # pixel width (x-direction resolution)
         dy = -geotransform.pixel_height  # pixel height (make positive, GDAL uses negative for north-up)
         mapx = geotransform.x_origin     # x-coordinate of upper-left corner
         mapy = geotransform.y_origin     # y-coordinate of upper-left corner  
         
-        # Calculate coordinate arrays
         x_full = [mapx + (i-1) * dx for i in 1:width]
         y_full = [mapy - (i-1) * dy for i in 1:height]
         
-        # Handle subsetting
         sub = [1, width, 1, height]  # default: full image
         
         if pixel_subset !== nothing
@@ -324,12 +317,10 @@ xx, yy, dhdt = get_smith_dhdt("ais_grounded.tif")
 ```
 """
 function get_smith_dhdt(filename::String)
-    # Read dhdt data
     dhdt = ArchGDAL.read(filename) do dataset
         ArchGDAL.read(dataset, 1)  # Read band 1
     end
 
-    # Get coordinate information
     coord_info = geotiff_read_axis_only(filename)
 
     # Calculate pixel center coordinates (PIXEL IS AREA, coordinate is North West corner)
@@ -370,7 +361,6 @@ function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.t
     # Read the file, skipping 21 header lines
     data = readdlm(filename, ' ', Float64; skipstart=21)
 
-    # Extract columns: lat, lon, x, y, acc, err
     aa_lat = data[:, 1]
     aa_lon = data[:, 2]
     aa_x = data[:, 3]
@@ -388,8 +378,7 @@ function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.t
     aa_y = aa_y[valid_mask]
     aa_err = aa_err[valid_mask]
 
-    # Convert accumulation from water equivalent to ice equivalent (divide by 917)
-    # 917 kg/m³ is the density of ice
+    # Convert accumulation from water equivalent to ice equivalent (divide by 917 kg/m³)
     aa_acc = aa_acc_raw[valid_mask] ./ 917.0
 
     return aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err
@@ -414,8 +403,6 @@ A tuple containing:
 - Only points where `ZwallyBasins > 0` are returned
 """
 function get_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
-
-    # Load the .mat file using do-block for automatic cleanup
     matopen(filename) do mat_file
         xx_zwally_full = read(mat_file, "xxZwallyBasins")
         yy_zwally_full = read(mat_file, "yyZwallyBasins")
@@ -454,7 +441,6 @@ A NamedTuple containing:
 """
 function get_frank_temps(filename::String="Data/FranksTemps.mat")
     matopen(filename) do mat_file
-        # Read the variables
         FranksTemps = read(mat_file, "FranksTemps")
         xxTemp = read(mat_file, "xxTemp")
         yyTemp = read(mat_file, "yyTemp")
@@ -490,7 +476,6 @@ A NamedTuple containing:
 """
 function get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
     matopen(filename) do mat_file
-        # Read the variables
         xx_v = read(mat_file, "xx_v")
         yy_v = read(mat_file, "yy_v")
         vx = read(mat_file, "vx")

@@ -27,7 +27,6 @@ function init_bedmachine(params)
     start_data = get(params, :start_data, "BEDMACHINEV3")
     bedmachine_file = get(params, :bedmachine_file, "Data/BedMachineAntarctica-v3.nc")
 
-    # Load BedMachine data
     if uppercase(start_data) == "BEDMACHINEV3"
         bed, x, y, geoid, mask, h, s = get_bedmachine(bedmachine_file)
 
@@ -85,8 +84,6 @@ function init_bedmachine(params)
 
     # Create H-grid structure
     Gh = create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
-
-    # Load additional datasets
     Gh = load_additional_datasets(Gh, params)
 
     # Create U/V/C grids
@@ -94,10 +91,7 @@ function init_bedmachine(params)
     Gv = create_v_grid(Gh)
     Gc = create_c_grid(Gh)
 
-    # Load velocity data
     Gu, Gv = load_velocity_data(Gu, Gv, Gh, params)
-
-    # Load temperature data
     Gh = load_temperature_data(Gh, params)
 
     return Gh, Gu, Gv, Gc
@@ -138,15 +132,12 @@ end
 Load accumulation, basin, and ALBMAP data.
 """
 function load_additional_datasets(Gh, params)
-    # Load Arthern accumulation
     aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation()
     Gh = merge(Gh, (a_Arthern = interpolate_to_grid(aa_x, aa_y, aa_acc, Gh.xx, Gh.yy)))
 
-    # Load Zwally drainage basins
     xx_zwally, yy_zwally, zwally_basins = get_zwally_basins()
     Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy)))
 
-    # Load ALBMAP data
     albmap_data = get_albmap("Data/ALBMAPv1.nc")
     Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy)))
 
@@ -220,11 +211,9 @@ function load_velocity_data(Gu, Gv, Gh, params)
     sub_samp = get(params, :sub_samp, 8)
 
     if veloc_data == "Measures_1"
-        # Load from MAT file
         velocity_data = get_measures_mat()
         xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
     elseif veloc_data in ["Measures_2016/17", "Measures_2014/15", "Measures_phase_v1"]
-        # Load from NetCDF
         filename = get_measures_filename(veloc_data)
         xx_v, yy_v, vx, vy = get_measures_velocities("Data/$filename")
     else
@@ -244,7 +233,6 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = vy[1:sub_samp:end, 1:sub_samp:end]
     end
 
-    # Interpolate to grids
     Gu = merge(Gu, (
         u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy),
         u_data_mask = .~isnan.(interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy))
