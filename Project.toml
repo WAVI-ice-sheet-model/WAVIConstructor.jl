@@ -5,10 +5,20 @@ version = "0.1.0"
 
 [deps]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+MAT = "23992714-dd62-5051-b70f-ba57cb901cac"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+WAVI = "881191c6-26ca-4787-919d-8f98f1c41532"
+
+[sources]
+WAVI = {url = "https://github.com/WAVI-ice-sheet-model/WAVI.jl.git", rev = "main"}
 
 [compat]
 ArchGDAL = "0.10.10"
+DelimitedFiles = "1.9.1"
+Interpolations = "0.16.2"
+MAT = "0.11.4"
 NCDatasets = "0.14.8"
 
 [extras]

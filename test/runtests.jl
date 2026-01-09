@@ -1,1 +1,2 @@
-include("test_get_albmap.jl")
+include("test_data_loading.jl")
+include("test_init_bedmachine.jl")
