@@ -16,13 +16,14 @@ mktempdir() do tmpdir
     vy = defVar(ds, "y", Float32, ("y",))
     vz = defVar(ds, "z", Float32, ("z",))
     vsigma = defVar(ds, "sigma", Float32, ("sigma",))
-    vtemp = defVar(ds, "T", Float32, ("x", "y", "z"))
+    # BISICLES temperature is stored as (z, y, x)
+    vtemp = defVar(ds, "T", Float32, ("z", "y", "x"))
 
     vx[:] .= collect(1.0f0:nx)
     vy[:] .= collect(1.0f0:ny)
     vz[:] .= collect(1.0f0:nz)
     vsigma[:] .= collect(0.1f0:0.1f0:0.2f0)
-    vtemp[:, :, :] .= reshape(collect(1.0f0:(nx*ny*nz)), nx, ny, nz)
+    vtemp[:, :, :] .= reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
 
     close(ds)
 
@@ -33,11 +34,14 @@ mktempdir() do tmpdir
     @test size(x) == (nx,)
     @test size(y) == (ny,)
     @test size(z) == (nz,)
-    @test size(temps) == (nx, ny, nz)
+    # The code uses temps[i, :, :], so it expects (nz, ny, nx)
+    @test size(temps) == (nz, ny, nx)
 
     @test all(x .== 1000 .* collect(1.0f0:nx))
     @test all(y .== 1000 .* collect(1.0f0:ny))
     @test all(z .== collect(1.0f0:nz))
     @test all(sigma .== collect(0.1f0:0.1f0:0.2f0))
-    @test all(temps .== reshape(collect(1.0f0:(nx*ny*nz)), nx, ny, nz))
+    # Check that temps contains the expected values
+    expected_temps = reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
+    @test all(temps .== expected_temps)
 end

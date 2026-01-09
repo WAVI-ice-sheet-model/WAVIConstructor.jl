@@ -9,12 +9,14 @@ mktempdir() do tmpdir
     dx, dy = 10.0, -10.0
     mapx, mapy = 100.0, 200.0
 
-    # Create mock dhdt data
+    # Create mock dhdt data in (height, width) format
     mock_dhdt = Float32[1.5 2.5 3.5 4.5; -1.0 0.0 1.0 2.0; -2.5 -1.5 -0.5 0.5]
 
-    ArchGDAL.create(mockfile, "GTiff", width, height, 1, ArchGDAL.GDT_Float32) do dataset
+    driver = ArchGDAL.getdriver("GTiff")
+    ArchGDAL.create(mockfile; driver=driver, width=width, height=height, nbands=1, dtype=Float32) do dataset
         ArchGDAL.setgeotransform!(dataset, [mapx, dx, 0.0, mapy, 0.0, dy])
-        ArchGDAL.write!(ArchGDAL.getband(dataset, 1), mock_dhdt)
+        # ArchGDAL expects data in (width, height) format, so transpose when writing
+        ArchGDAL.write!(ArchGDAL.getband(dataset, 1), permutedims(mock_dhdt, (2, 1)))
     end
 
     println("Testing get_smith_dhdt on: ", mockfile)

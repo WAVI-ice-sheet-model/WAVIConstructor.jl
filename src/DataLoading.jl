@@ -97,16 +97,19 @@ Load BedMachine NetCDF variables and return them.
 """
 function get_bedmachine(filename::String)
     ds = NCDataset(filename)
-    bed = ds["bed"][:]
-    x = ds["x"][:]
-    y = ds["y"][:]
-    geoid = ds["geoid"][:]
-    mask = ds["mask"][:]
-    surface = ds["surface"][:]
-    thickness = ds["thickness"][:]
-    firn = ds["firn"][:]
-    close(ds)
-    return bed, x, y, geoid, mask, thickness, surface, firn
+    try
+        bed = ds["bed"][:]
+        x = ds["x"][:]
+        y = ds["y"][:]
+        geoid = ds["geoid"][:]
+        mask = ds["mask"][:]
+        surface = ds["surface"][:]
+        thickness = ds["thickness"][:]
+        firn = ds["firn"][:]
+        return bed, x, y, geoid, mask, thickness, surface, firn
+    finally
+        close(ds)
+    end
 end
 
 
@@ -137,13 +140,11 @@ sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", sc
 function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
     ds = NCDataset(fname_start)
     try
-        read_data(varname, scale_factor=1) = scale_factor .* ds[varname][:]
-
-        bisicles_sigma = read_data("sigma")
-        bisicles_temps = read_data("T")
-        bisicles_x = read_data("x", scale_xy)
-        bisicles_y = read_data("y", scale_xy)
-        bisicles_z = read_data("z")
+        bisicles_sigma = Array(ds["sigma"])
+        bisicles_temps = Array(ds["T"])
+        bisicles_x = scale_xy .* Array(ds["x"])
+        bisicles_y = scale_xy .* Array(ds["y"])
+        bisicles_z = Array(ds["z"])
 
         return bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps
     finally
@@ -174,10 +175,10 @@ xx, yy, vx, vy = get_measures_velocities("Antarctic_ice_velocity_2016_2017_1km_v
 function get_measures_velocities(filename::String)
     ds = NCDataset(filename)
     try
-        Measures_x = ds["x"][:]
-        Measures_y = ds["y"][:]
-        VX = ds["VX"][:]
-        VY = ds["VY"][:]
+        Measures_x = Array(ds["x"])
+        Measures_y = Array(ds["y"])
+        VX = Array(ds["VX"])
+        VY = Array(ds["VY"])
         
         # Create coordinate grids (equivalent to MATLAB's ndgrid)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
@@ -317,7 +318,7 @@ xx, yy, dhdt = get_smith_dhdt("ais_grounded.tif")
 ```
 """
 function get_smith_dhdt(filename::String)
-    dhdt = ArchGDAL.read(filename) do dataset
+    dhdt_raw = ArchGDAL.read(filename) do dataset
         ArchGDAL.read(dataset, 1)  # Read band 1
     end
 
@@ -330,6 +331,14 @@ function get_smith_dhdt(filename::String)
     # Create coordinate grids equivalent to MATLAB's ndgrid(flip(y), x)
     yy = repeat(reverse(y), 1, length(x))
     xx = repeat(x', length(y), 1)
+
+    # Transpose dhdt to match coordinate grid shape (height, width)
+    # ArchGDAL reads data as (width, height), but we want (height, width) to match xx and yy
+    if size(dhdt_raw) == (length(x), length(y))
+        dhdt = permutedims(dhdt_raw, (2, 1))
+    else
+        dhdt = dhdt_raw
+    end
 
     return xx, yy, dhdt
 end

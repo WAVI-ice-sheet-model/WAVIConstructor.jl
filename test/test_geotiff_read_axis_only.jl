@@ -9,7 +9,8 @@ mktempdir() do tmpdir
     dx, dy = 10.0, -10.0
     mapx, mapy = 100.0, 200.0
 
-    ArchGDAL.create(mockfile, "GTiff", width, height, 1, ArchGDAL.GDT_Float32) do dataset
+    driver = ArchGDAL.getdriver("GTiff")
+    ArchGDAL.create(mockfile; driver=driver, width=width, height=height, nbands=1, dtype=Float32) do dataset
         ArchGDAL.setgeotransform!(dataset, [mapx, dx, 0.0, mapy, 0.0, dy])
         ArchGDAL.write!(ArchGDAL.getband(dataset, 1), ones(Float32, width, height))
     end
