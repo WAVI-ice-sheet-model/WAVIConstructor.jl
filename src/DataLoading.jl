@@ -2,8 +2,10 @@ module DataLoading
 
 using ArchGDAL
 using NCDatasets
+using MAT
+import DelimitedFiles: readdlm
 
-export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt
+export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, load_arthern_accumulation, load_zwally_basins, load_frank_temps, load_measures_mat
 
 
 """
@@ -339,6 +341,168 @@ function get_smith_dhdt(filename::String)
     xx = repeat(x', length(y), 1)
 
     return xx, yy, dhdt
+end
+
+"""
+    load_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+
+Load Arthern accumulation data from a text file.
+
+# Arguments
+- `filename::String`: Path to the Arthern accumulation text file (default: "Data/amsr_accumulation_map.txt")
+
+# Returns
+A tuple containing:
+- `aa_lat`: Latitude values
+- `aa_lon`: Longitude values
+- `aa_x`: X-coordinate values (in meters)
+- `aa_y`: Y-coordinate values (in meters)
+- `aa_acc`: Accumulation values (converted to ice equivalent, divided by 917)
+- `aa_err`: Error values
+
+# Notes
+- The file should have 21 header lines
+- Data is space-delimited with 6 columns
+- Accumulation values are converted from water equivalent to ice equivalent (divided by 917 kg/m³)
+- Rows with NaN accumulation values are filtered out
+"""
+function load_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+    # Read the file, skipping 21 header lines
+    data = readdlm(filename, ' ', Float64; skipstart=21)
+
+    # Extract columns: lat, lon, x, y, acc, err
+    aa_lat = data[:, 1]
+    aa_lon = data[:, 2]
+    aa_x = data[:, 3]
+    aa_y = data[:, 4]
+    aa_acc_raw = data[:, 5]
+    aa_err = data[:, 6]
+
+    # Filter out rows where accumulation is NaN
+    valid_mask = .!isnan.(aa_acc_raw)
+
+    # Apply mask to all arrays
+    aa_lat = aa_lat[valid_mask]
+    aa_lon = aa_lon[valid_mask]
+    aa_x = aa_x[valid_mask]
+    aa_y = aa_y[valid_mask]
+    aa_err = aa_err[valid_mask]
+
+    # Convert accumulation from water equivalent to ice equivalent (divide by 917)
+    # 917 kg/m³ is the density of ice
+    aa_acc = aa_acc_raw[valid_mask] ./ 917.0
+
+    return aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err
+end
+
+"""
+    load_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+
+Load Zwally drainage basins from a MATLAB .mat file.
+
+# Arguments
+- `filename::String`: Path to the Zwally basins .mat file (default: "Data/DrainageBasins/ZwallyBasins.mat")
+
+# Returns
+A tuple containing:
+- `xx_zwally`: X-coordinate values (filtered to only include points where ZwallyBasins > 0)
+- `yy_zwally`: Y-coordinate values (filtered to only include points where ZwallyBasins > 0)
+- `zwally_basins`: Basin ID values (filtered to only include points where ZwallyBasins > 0)
+
+# Notes
+- The .mat file should contain variables: `xxZwallyBasins`, `yyZwallyBasins`, `ZwallyBasins`
+- Only points where `ZwallyBasins > 0` are returned
+"""
+function load_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+
+    # Load the .mat file using do-block for automatic cleanup
+    matopen(filename) do mat_file
+        xx_zwally_full = read(mat_file, "xxZwallyBasins")
+        yy_zwally_full = read(mat_file, "yyZwallyBasins")
+        zwally_basins_full = read(mat_file, "ZwallyBasins")
+
+        # Filter to only include points where ZwallyBasins > 0
+        valid_mask = zwally_basins_full .> 0
+
+        # Apply mask - works for both 1D and 2D arrays
+        xx_zwally = xx_zwally_full[valid_mask]
+        yy_zwally = yy_zwally_full[valid_mask]
+        zwally_basins = zwally_basins_full[valid_mask]
+
+        return xx_zwally, yy_zwally, zwally_basins
+    end
+end
+
+"""
+    load_frank_temps(filename::String="Data/FranksTemps.mat")
+
+Load Frank temperature data from a MATLAB .mat file.
+
+# Arguments
+- `filename::String`: Path to the FranksTemps .mat file (default: "Data/FranksTemps.mat")
+
+# Returns
+A NamedTuple containing:
+- `FranksTemps`: 3D temperature data array (levels × points)
+- `xxTemp`: X-coordinate values
+- `yyTemp`: Y-coordinate values
+- `sigmaTemp`: Sigma coordinate values (vertical levels)
+
+# Notes
+- The .mat file should contain variables: `FranksTemps`, `xxTemp`, `yyTemp`, `sigmaTemp`
+- FranksTemps is a 2D array where rows represent vertical levels and columns represent spatial points
+"""
+function load_frank_temps(filename::String="Data/FranksTemps.mat")
+    matopen(filename) do mat_file
+        # Read the variables
+        FranksTemps = read(mat_file, "FranksTemps")
+        xxTemp = read(mat_file, "xxTemp")
+        yyTemp = read(mat_file, "yyTemp")
+        sigmaTemp = read(mat_file, "sigmaTemp")
+
+        return (
+            FranksTemps = FranksTemps,
+            xxTemp = xxTemp,
+            yyTemp = yyTemp,
+            sigmaTemp = sigmaTemp
+        )
+    end
+end
+
+"""
+    load_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
+
+Load MEaSUREs ice velocity data from a MATLAB .mat file.
+
+# Arguments
+- `filename::String`: Path to the MEaSUREs velocity .mat file (default: "Data/MEaSUREs/MEaSUREsAntVels.mat")
+
+# Returns
+A NamedTuple containing:
+- `xx_v`: 2D grid of x coordinates
+- `yy_v`: 2D grid of y coordinates
+- `vx`: X-component velocity data
+- `vy`: Y-component velocity data
+
+# Notes
+- The .mat file should contain variables: `xx_v`, `yy_v`, `vx`, `vy`
+- This is the older MEaSUREs dataset format (Measures_1)
+"""
+function load_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
+    matopen(filename) do mat_file
+        # Read the variables
+        xx_v = read(mat_file, "xx_v")
+        yy_v = read(mat_file, "yy_v")
+        vx = read(mat_file, "vx")
+        vy = read(mat_file, "vy")
+
+        return (
+            xx_v = xx_v,
+            yy_v = yy_v,
+            vx = vx,
+            vy = vy
+        )
+    end
 end
 
 end # module
