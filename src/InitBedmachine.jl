@@ -25,10 +25,11 @@ Tuple of grid structures (Gh, Gu, Gv, Gc) with loaded data
 """
 function init_bedmachine(params)
     start_data = get(params, :start_data, "BEDMACHINEV3")
+    bedmachine_file = get(params, :bedmachine_file, "Data/BedMachineAntarctica-v3.nc")
 
     # Load BedMachine data
     if uppercase(start_data) == "BEDMACHINEV3"
-        bed, x, y, geoid, mask, h, s = get_bedmachine("Data/BedMachineAntarctica-v3.nc")
+        bed, x, y, geoid, mask, h, s = get_bedmachine(bedmachine_file)
 
         # Flip arrays for correct orientation
         bed = reverse(bed, dims=1)
@@ -138,11 +139,11 @@ Load accumulation, basin, and ALBMAP data.
 """
 function load_additional_datasets(Gh, params)
     # Load Arthern accumulation
-    aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = load_arthern_accumulation()
+    aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation()
     Gh = merge(Gh, (a_Arthern = interpolate_to_grid(aa_x, aa_y, aa_acc, Gh.xx, Gh.yy)))
 
     # Load Zwally drainage basins
-    xx_zwally, yy_zwally, zwally_basins = load_zwally_basins()
+    xx_zwally, yy_zwally, zwally_basins = get_zwally_basins()
     Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy)))
 
     # Load ALBMAP data
@@ -220,7 +221,7 @@ function load_velocity_data(Gu, Gv, Gh, params)
 
     if veloc_data == "Measures_1"
         # Load from MAT file
-        velocity_data = load_measures_mat()
+        velocity_data = get_measures_mat()
         xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
     elseif veloc_data in ["Measures_2016/17", "Measures_2014/15", "Measures_phase_v1"]
         # Load from NetCDF
@@ -266,7 +267,7 @@ function load_temperature_data(Gh, params)
     temps = get(params, :temps, "BISICLES_8km")
 
     if temps == "Frank"
-        temp_data = load_frank_temps()
+        temp_data = get_frank_temps()
         temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
         for i in 1:size(temp_data.FranksTemps, 1)
             temperature[i, :, :] = interpolate_to_grid(
