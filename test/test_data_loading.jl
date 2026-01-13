@@ -214,19 +214,32 @@ end
         mapx, mapy = 100.0, 200.0
         mock_dhdt = Float32[1.5 2.5 3.5 4.5; -1.0 0.0 1.0 2.0; -2.5 -1.5 -0.5 0.5]
 
-        mockfile = create_mock_geotiff(tmpdir, "mock_smith_dhdt.tif", width, height, dx, dy, mapx, mapy,
+        grnd_file = create_mock_geotiff(tmpdir, "mock_smith_grnd.tif", width, height, dx, dy, mapx, mapy,
             permutedims(mock_dhdt, (2, 1)))
+        flt_file = create_mock_geotiff(tmpdir, "mock_smith_flt.tif", width, height, dx, dy, mapx, mapy,
+            permutedims(mock_dhdt .* 0.5, (2, 1)))
 
-        xx, yy, dhdt = get_smith_dhdt(mockfile)
-
-        @test size(xx) == (height, width)
-        @test size(yy) == (height, width) 
-        @test size(dhdt) == (height, width)
+        result = get_smith_dhdt(grnd_file=grnd_file, flt_file=flt_file)
+        
+        # The function flips data with reverse(dhdt, dims=1), so expected data should be flipped
+        expected_grnd = reverse(mock_dhdt, dims=1)
+        expected_flt = reverse(mock_dhdt .* 0.5, dims=1)
+        
+        # Test grounded data
+        @test size(result.grnd_xx) == (height, width)
+        @test size(result.grnd_yy) == (height, width) 
+        @test size(result.grnd_dhdt) == (height, width)
         expected_x = [mapx + dx * (i - 0.5) for i in 1:width]
         expected_y = [mapy - abs(dy) * (i - 0.5) for i in 1:height]
-        @test all(xx[1, :] .≈ expected_x)
-        @test all(yy[:, 1] .≈ reverse(expected_y))
-        @test all(dhdt .≈ mock_dhdt)
+        @test all(result.grnd_xx[1, :] .≈ expected_x)
+        @test all(result.grnd_yy[:, 1] .≈ reverse(expected_y))
+        @test all(result.grnd_dhdt .≈ expected_grnd)
+        
+        # Test floating data
+        @test size(result.flt_xx) == (height, width)
+        @test size(result.flt_yy) == (height, width)
+        @test size(result.flt_dhdt) == (height, width)
+        @test all(result.flt_dhdt .≈ expected_flt)
     end
 
     # Test get_zwally_basins
