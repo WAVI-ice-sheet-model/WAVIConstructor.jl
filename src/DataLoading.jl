@@ -3,6 +3,7 @@ module DataLoading
 using ArchGDAL
 using NCDatasets
 using MAT
+using NearestNeighbors
 import DelimitedFiles: readdlm
 
 export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, get_arthern_accumulation, get_zwally_basins, get_frank_temps, get_measures_mat
@@ -98,14 +99,14 @@ Load BedMachine NetCDF variables and return them.
 function get_bedmachine(filename::String)
     ds = NCDataset(filename)
     try
-        bed = ds["bed"][:]
-        x = ds["x"][:]
-        y = ds["y"][:]
-        geoid = ds["geoid"][:]
-        mask = ds["mask"][:]
-        surface = ds["surface"][:]
-        thickness = ds["thickness"][:]
-        firn = ds["firn"][:]
+        bed = Array(ds["bed"])
+        x = Array(ds["x"])
+        y = Array(ds["y"])
+        geoid = Array(ds["geoid"])
+        mask = Array(ds["mask"])
+        surface = Array(ds["surface"])
+        thickness = Array(ds["thickness"])
+        firn = Array(ds["firn"])
         return bed, x, y, geoid, mask, thickness, surface, firn
     finally
         close(ds)
@@ -140,10 +141,10 @@ sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", sc
 function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
     ds = NCDataset(fname_start)
     try
-        bisicles_sigma = Array(ds["sigma"])
+        bisicles_sigma = vec(Array(ds["sigma"]))  # Ensure it's a vector
         bisicles_temps = Array(ds["T"])
-        bisicles_x = scale_xy .* Array(ds["x"])
-        bisicles_y = scale_xy .* Array(ds["y"])
+        bisicles_x = vec(scale_xy .* Array(ds["x"]))  # Ensure it's a vector
+        bisicles_y = vec(scale_xy .* Array(ds["y"]))  # Ensure it's a vector
         bisicles_z = Array(ds["z"])
 
         return bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps
@@ -299,48 +300,103 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
 end
 
 """
-    get_smith_dhdt(filename::String)
+    get_smith_dhdt(; grnd_file=nothing, flt_file=nothing, smith_dir="Data/Smith_2020_dhdt")
 
-Load dhdt (elevation/thickness change) data from a single Smith et al. 2020 GeoTIFF file.
+Load dhdt (elevation/thickness change) data from Smith et al. 2020 GeoTIFF file(s).
 
 # Arguments
-- `filename::String`: Path to the GeoTIFF file
+- `grnd_file::Union{String,Nothing}`: Path to grounded ice GeoTIFF file (optional)
+- `flt_file::Union{String,Nothing}`: Path to floating ice GeoTIFF file (optional)
+- `smith_dir::String`: Directory containing default files if grnd_file/flt_file not specified
 
 # Returns
-A tuple containing:
-- `xx`: 2D grid of x coordinates
-- `yy`: 2D grid of y coordinates  
-- `dhdt`: Elevation/thickness change data
+If both grnd_file and flt_file are provided (or found in smith_dir):
+- NamedTuple with (grnd_xx, grnd_yy, grnd_dhdt, flt_xx, flt_yy, flt_dhdt)
 
-# Example
+If only one file is provided:
+- Tuple (xx, yy, dhdt)
+
+# Examples
 ```julia
-xx, yy, dhdt = get_smith_dhdt("ais_grounded.tif")
+# Load single file
+xx, yy, dhdt = get_smith_dhdt(grnd_file="ais_grounded.tif")
+
+# Load both files from directory
+data = get_smith_dhdt(smith_dir="Data/Smith_2020_dhdt")
+
+# Load both files explicitly
+data = get_smith_dhdt(grnd_file="ais_grounded.tif", flt_file="ais_floating.tif")
 ```
 """
-function get_smith_dhdt(filename::String)
-    dhdt_raw = ArchGDAL.read(filename) do dataset
-        ArchGDAL.read(dataset, 1)  # Read band 1
+function get_smith_dhdt(; grnd_file=nothing, flt_file=nothing, smith_dir="Data/Smith_2020_dhdt")
+    # Helper function to load a single file
+    function load_single_file(filename)
+        dhdt_raw = ArchGDAL.read(filename) do dataset
+            ArchGDAL.read(dataset, 1)  # Read band 1
+        end
+
+        coord_info = geotiff_read_axis_only(filename)
+
+        # Calculate pixel centre coordinates (PIXEL IS AREA, coordinate is North West corner)
+        x = [coord_info.info.map_info.mapx + coord_info.info.map_info.dx * (i - 0.5) for i in 1:coord_info.info.samples]
+        y = [coord_info.info.map_info.mapy - coord_info.info.map_info.dy * (i - 0.5) for i in 1:coord_info.info.lines]
+
+        # Create coordinate grids equivalent to MATLAB's ndgrid(flip(y), x)
+        yy = repeat(reverse(y), 1, length(x))
+        xx = repeat(x', length(y), 1)
+
+        # Transpose dhdt to match coordinate grid shape (height, width)
+        # ArchGDAL reads data as (width, height), but we want (height, width) to match xx and yy
+        if size(dhdt_raw) == (length(x), length(y))
+            dhdt = permutedims(dhdt_raw, (2, 1))
+        else
+            dhdt = dhdt_raw
+        end
+        
+        # Flip to match MATLAB behavior
+        dhdt_flipped = reverse(dhdt, dims=1)
+
+        return xx, yy, dhdt_flipped
     end
-
-    coord_info = geotiff_read_axis_only(filename)
-
-    # Calculate pixel center coordinates (PIXEL IS AREA, coordinate is North West corner)
-    x = [coord_info.info.map_info.mapx + coord_info.info.map_info.dx * (i - 0.5) for i in 1:coord_info.info.samples]
-    y = [coord_info.info.map_info.mapy - coord_info.info.map_info.dy * (i - 0.5) for i in 1:coord_info.info.lines]
-
-    # Create coordinate grids equivalent to MATLAB's ndgrid(flip(y), x)
-    yy = repeat(reverse(y), 1, length(x))
-    xx = repeat(x', length(y), 1)
-
-    # Transpose dhdt to match coordinate grid shape (height, width)
-    # ArchGDAL reads data as (width, height), but we want (height, width) to match xx and yy
-    if size(dhdt_raw) == (length(x), length(y))
-        dhdt = permutedims(dhdt_raw, (2, 1))
-    else
-        dhdt = dhdt_raw
+    
+    # Determine which files to load
+    if grnd_file === nothing && flt_file === nothing
+        # Load both from default directory
+        grnd_file = joinpath(smith_dir, "ais_grounded.tif")
+        flt_file = joinpath(smith_dir, "ais_floating.tif")
     end
-
-    return xx, yy, dhdt
+    
+    # Load files
+    if grnd_file !== nothing && flt_file !== nothing
+        # Load both files
+        if !isfile(grnd_file) || !isfile(flt_file)
+            return nothing
+        end
+        
+        grnd_xx, grnd_yy, grnd_dhdt = load_single_file(grnd_file)
+        flt_xx, flt_yy, flt_dhdt = load_single_file(flt_file)
+        
+        return (
+            grnd_xx = grnd_xx,
+            grnd_yy = grnd_yy,
+            grnd_dhdt = grnd_dhdt,
+            flt_xx = flt_xx,
+            flt_yy = flt_yy,
+            flt_dhdt = flt_dhdt
+        )
+    elseif grnd_file !== nothing
+        # Load only grounded file
+        if !isfile(grnd_file)
+            return nothing
+        end
+        return load_single_file(grnd_file)
+    elseif flt_file !== nothing
+        # Load only floating file
+        if !isfile(flt_file)
+            return nothing
+        end
+        return load_single_file(flt_file)
+    end
 end
 
 """
@@ -459,7 +515,7 @@ function get_frank_temps(filename::String="Data/FranksTemps.mat")
             FranksTemps = FranksTemps,
             xxTemp = xxTemp,
             yyTemp = yyTemp,
-            sigmaTemp = sigmaTemp
+            sigmaTemp = vec(sigmaTemp)  # Ensure it's a vector, not a matrix
         )
     end
 end
@@ -497,6 +553,39 @@ function get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
             vy = vy
         )
     end
+end
+
+"""
+    interpolate_to_grid(x, y, values, xi, yi)
+
+Interpolate scattered data to a regular grid using nearest neighbor interpolation.
+This is equivalent to MATLAB's TriScatteredInterp with 'nearest' method.
+
+# Arguments
+- `x, y`: 1D arrays of scattered point coordinates
+- `values`: 1D array of values at scattered points
+- `xi, yi`: 2D arrays of target grid coordinates
+
+# Returns
+- 2D array of interpolated values on the target grid
+"""
+function interpolate_to_grid(x, y, values, xi, yi)
+    # Flatten target grid coordinates
+    xi_flat = vec(xi)
+    yi_flat = vec(yi)
+    
+    # Build KDTree for efficient nearest neighbor search
+    points = hcat(x, y)
+    tree = KDTree(points')
+    
+    # Find nearest neighbors for each target point
+    indices, _ = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
+    
+    # Extract values at nearest neighbors
+    result_flat = [values[idx[1]] for idx in indices]
+    
+    # Reshape to match target grid
+    return reshape(result_flat, size(xi))
 end
 
 end # module
