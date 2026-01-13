@@ -7,6 +7,7 @@ using Interpolations
 
 using WAVIConstructor.InitBedMachine: init_bedmachine
 using WAVIConstructor.DomainSelection: select_domain_wavi
+using WAVIConstructor.ParamHelpers: ConstructorParams, to_dict
 
 export setup_wavi_data
 
@@ -193,6 +194,22 @@ function setup_wavi_data(params; output_path="outputs", edge=3)
     write_binary_files(Gh, Gu, Gv, output_path)
     
     return Gh, Gu, Gv, Gc
+end
+
+"""
+    setup_wavi_data(params::ConstructorParams; kwargs...)
+
+Convenience method that accepts a ConstructorParams struct directly.
+Converts it to a Dict and calls the main setup_wavi_data function.
+
+# Example
+```julia
+params = minimal_constructor_params(temps="Frank")
+Gh, Gu, Gv, Gc = setup_wavi_data(params)  # No need for to_dict!
+```
+"""
+function setup_wavi_data(params::ConstructorParams; kwargs...)
+    return setup_wavi_data(to_dict(params); kwargs...)
 end
 
 """
