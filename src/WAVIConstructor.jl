@@ -1,10 +1,10 @@
 module WAVIConstructor
 
 include("DataLoading.jl")
+include("ConstructorParams.jl")
 include("InitBedmachine.jl")
 include("DomainSelection.jl")
 include("SetupData.jl")
-include("ConstructorParams.jl")
 
 # Re-export main functions from submodules
 using .InitBedMachine: init_bedmachine
