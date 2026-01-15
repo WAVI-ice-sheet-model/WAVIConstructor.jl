@@ -38,7 +38,6 @@ WAVIConstructor.DataLoading.get_zwally_basins
 WAVIConstructor.DataLoading.get_frank_temps
 WAVIConstructor.DataLoading.get_measures_mat
 WAVIConstructor.DataLoading.geotiff_read_axis_only
-WAVIConstructor.DataLoading.interpolate_to_grid
 ```
 
 ## Internal Functions

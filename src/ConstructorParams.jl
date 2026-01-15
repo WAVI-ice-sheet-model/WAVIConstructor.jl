@@ -3,7 +3,7 @@
 
 module ParamHelpers
 
-export ConstructorParams, default_constructor_params, minimal_constructor_params
+export ConstructorParams, default_constructor_params, minimal_constructor_params, to_dict
 
 """
     ConstructorParams
