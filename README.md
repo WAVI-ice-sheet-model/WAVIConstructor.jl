@@ -32,10 +32,12 @@ The `init_bedmachine` and `select_domain_wavi` functions are wrapped within `set
 
 All configurations (data sources, domains, grid spacing, file output) are defined in the constructor params.
 
+### Simple Workflow
+
 ```julia
 using WAVIConstructor
 
-# Option 1: Using ConstructorParams (recommended)
+# Define all data contruction parameters
 params = default_constructor_params(
     bedmachine_file = "Data/BedMachineAntarctica-v3.nc",
     dx = 10000.0,  # Grid spacing in metres
@@ -45,7 +47,50 @@ params = default_constructor_params(
     temps = "BISICLES_8km",  # Temperature dataset
     output_path = "wavi_inversion_input"
 )
+
+# Complete workflow: initialise, select domain, and write WAVI input files
+Gh, Gu, Gv, Gc = setup_wavi_data(params)
 ```
+
+### Running step-by-step
+
+You can also run the workflow step-by-step for more control and intermediate inspection:
+
+```julia
+# Step 1: Initialise grids
+Gh, Gu, Gv, Gc = init_bedmachine(params)
+
+# Step 2: Select domain
+Gh, Gu, Gv, Gc = select_domain_wavi(Gh, Gu, Gv, Gc, params)
+
+# Step 3: Process and write files
+Gh, Gu, Gv, Gc = setup_wavi_data(params)
+```
+
+### Loading data only
+You can also use the low-level data loading functions directly to inspect specific datasets:
+
+```julia
+using WAVIConstructor.DataLoading
+
+# Load specific datasets
+bed, x, y, geoid, mask, thickness, surface, firn = get_bedmachine("Data/BedMachineAntarctica-v3.nc")
+xx, yy, vx, vy = get_measures_velocities("Data/velocity_file.nc")
+```
+## Outputs
+
+After running `setup_wavi_data()`, you'll have binary `.bin` files in your output directory containing:
+
+- Grid geometry (coordinates, spacing)
+- Ice thickness
+- Bed topography
+- Surface elevation
+- Velocities (u, v components)
+- Temperature fields
+- Accumulation rates
+- Domain masks
+
+These files are in the format expected by WAVI.jl.
 
 ## Configuration Parameters
 
