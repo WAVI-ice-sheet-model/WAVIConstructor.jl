@@ -141,10 +141,10 @@ sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", sc
 function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
     ds = NCDataset(fname_start)
     try
-        bisicles_sigma = vec(Array(ds["sigma"]))  # Ensure it's a vector
+        bisicles_sigma = vec(Array(ds["sigma"]))
         bisicles_temps = Array(ds["T"])
-        bisicles_x = vec(scale_xy .* Array(ds["x"]))  # Ensure it's a vector
-        bisicles_y = vec(scale_xy .* Array(ds["y"]))  # Ensure it's a vector
+        bisicles_x = vec(scale_xy .* Array(ds["x"]))
+        bisicles_y = vec(scale_xy .* Array(ds["y"]))  
         bisicles_z = Array(ds["z"])
 
         return bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps
@@ -515,7 +515,7 @@ function get_frank_temps(filename::String="Data/FranksTemps.mat")
             FranksTemps = FranksTemps,
             xxTemp = xxTemp,
             yyTemp = yyTemp,
-            sigmaTemp = vec(sigmaTemp)  # Ensure it's a vector, not a matrix
+            sigmaTemp = vec(sigmaTemp)
         )
     end
 end
