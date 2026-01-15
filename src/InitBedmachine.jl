@@ -228,15 +228,13 @@ function load_additional_datasets(Gh, params)
         Gh = merge(Gh, (basin_id = zeros(size(Gh.xx)),))
     end
 
-    # Load ALBMAP if file exists
+    # Load ALBMAP (required)
     albmap_file = get(params, :albmap_file, "Data/ALBMAPv1.nc")
-    if isfile(albmap_file)
-        albmap_data = get_albmap(albmap_file)
-        Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy),))
-    else
-        @warn "ALBMAP file not found: $albmap_file. Using 253K (typical Antarctic value)."
-        Gh = merge(Gh, (Tma = fill(253.0, size(Gh.xx)),))
+    if !isfile(albmap_file)
+        error("ALBMAP file not found: $albmap_file. Please provide the ALBMAP file or set params[:albmap_file] to the correct path.")
     end
+    albmap_data = get_albmap(albmap_file)
+    Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy),))
 
     return Gh
 end
