@@ -9,7 +9,9 @@ using MAT
 using Interpolations
 using WAVI
 
-using WAVIConstructor.DataLoading
+using WAVIConstructor.DataLoading: get_arthern_accumulation, get_zwally_basins, get_albmap, 
+    get_bisicles_temps, get_frank_temps, get_measures_velocities, get_measures_mat, 
+    get_smith_dhdt, interpolate_to_grid, get_bedmachine
 
 """
     init_bedmachine(params)
@@ -85,6 +87,80 @@ function init_bedmachine(params)
     # Create H-grid structure
     Gh = create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
     Gh = load_additional_datasets(Gh, params)
+    
+    # Calculate height above floatation and grounded ice mask
+    density_ice = get(params, :density_ice, 918.0)
+    density_ocean = get(params, :density_ocean, 1028.0)
+    min_thick = get(params, :min_thick, 50.0)
+    
+    # Calculate hAF first
+    hAF = Gh.h .+ (density_ocean / density_ice) .* Gh.b
+    aground = (hAF .>= 0) .& .!Gh.rockmask .& (mask .!= 4)
+    
+    Gh = merge(Gh, (
+        hAF = hAF,
+        aground = aground,
+        surfType = zeros(size(mask))
+    ))
+    
+    # Set surfType based on aground mask
+    surfType_calc = (Gh.aground .* 1) .+ ((.!Gh.aground .& (Gh.h .> 0.0)) .* 2) .+ (Gh.rockmask .* 3)
+    Gh = merge(Gh, (surfType = surfType_calc,))
+    
+    # Recalculate ice and rock with updated surfType
+    Gh = merge(Gh, (
+        ice = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2)),
+        rock = (Gh.surfType .== 3) .| (Gh.aground .& (Gh.h .< min_thick)),
+        ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2))
+    ))
+    
+    # Load dhdt data if specified
+    dhdt_data = get(params, :dhdt_data, "Smith")
+    
+    if dhdt_data == "Smith"
+        smith_dir = get(params, :smith_dhdt_dir, "Data/Smith_2020_dhdt")
+        smith_data = get_smith_dhdt(smith_dir=smith_dir)
+        
+        if smith_data !== nothing
+            # Interpolate grounded data
+            fdhdt_grnd = .!isnan.(smith_data.grnd_dhdt)
+            dhdt_grnd = interpolate_to_grid(
+                smith_data.grnd_xx[fdhdt_grnd][:], 
+                smith_data.grnd_yy[fdhdt_grnd][:], 
+                smith_data.grnd_dhdt[fdhdt_grnd][:], 
+                Gh.xx, Gh.yy
+            )
+            
+            # Interpolate floating data
+            fdhdt_flt = .!isnan.(smith_data.flt_dhdt)
+            dhdt_flt = interpolate_to_grid(
+                smith_data.flt_xx[fdhdt_flt][:], 
+                smith_data.flt_yy[fdhdt_flt][:], 
+                smith_data.flt_dhdt[fdhdt_flt][:], 
+                Gh.xx, Gh.yy
+            )
+            
+            # Combine based on surfType: floating (2) uses flt, grounded (1 or 4) uses grnd
+            dhdt = zeros(size(Gh.surfType))
+            dhdt[Gh.surfType .== 2] .= dhdt_flt[Gh.surfType .== 2]
+            dhdt[(Gh.surfType .== 1) .| (Gh.surfType .== 4)] .= dhdt_grnd[(Gh.surfType .== 1) .| (Gh.surfType .== 4)]
+            
+            Gh = merge(Gh, (dhdt = dhdt,))
+        else
+            # Return zeros if files not found
+            Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
+        end
+    else
+        # Return zeros for other datasets (not implemented yet)
+        Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
+    end
+    
+    # Add aliases for compatibility with SelectDomainWAVI
+    Gh = merge(Gh, (
+        basinID = Gh.basin_id,
+        a = Gh.a_Arthern,
+        rock = Gh.rockmask
+    ))
 
     # Create U/V/C grids
     Gu = create_u_grid(Gh)
@@ -132,14 +208,33 @@ end
 Load accumulation, basin, and ALBMAP data.
 """
 function load_additional_datasets(Gh, params)
-    aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation()
-    Gh = merge(Gh, (a_Arthern = interpolate_to_grid(aa_x, aa_y, aa_acc, Gh.xx, Gh.yy)))
+    # Load Arthern accumulation if file exists
+    arthern_file = get(params, :arthern_file, "Data/amsr_accumulation_map.txt")
+    if isfile(arthern_file)
+        aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation(arthern_file)
+        Gh = merge(Gh, (a_Arthern = interpolate_to_grid(aa_x, aa_y, aa_acc, Gh.xx, Gh.yy),))
+    else
+        @warn "Arthern accumulation file not found: $arthern_file. Using zeros."
+        Gh = merge(Gh, (a_Arthern = zeros(size(Gh.xx)),))
+    end
 
-    xx_zwally, yy_zwally, zwally_basins = get_zwally_basins()
-    Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy)))
+    # Load Zwally basins if file exists
+    zwally_file = get(params, :zwally_file, "Data/DrainageBasins/ZwallyBasins.mat")
+    if isfile(zwally_file)
+        xx_zwally, yy_zwally, zwally_basins = get_zwally_basins(zwally_file)
+        Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy),))
+    else
+        @warn "Zwally basins file not found: $zwally_file. Using zeros."
+        Gh = merge(Gh, (basin_id = zeros(size(Gh.xx)),))
+    end
 
-    albmap_data = get_albmap("Data/ALBMAPv1.nc")
-    Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy)))
+    # Load ALBMAP (required)
+    albmap_file = get(params, :albmap_file, "Data/ALBMAPv1.nc")
+    if !isfile(albmap_file)
+        error("ALBMAP file not found: $albmap_file. Please provide the ALBMAP file or set params[:albmap_file] to the correct path.")
+    end
+    albmap_data = get_albmap(albmap_file)
+    Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy),))
 
     return Gh
 end
@@ -210,14 +305,36 @@ function load_velocity_data(Gu, Gv, Gh, params)
     veloc_data = get(params, :veloc_data, "Measures_2014/15")
     sub_samp = get(params, :sub_samp, 8)
 
+    velocity_loaded = false
+    
     if veloc_data == "Measures_1"
-        velocity_data = get_measures_mat()
-        xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
+        measures_file = get(params, :measures_mat_file, "Data/MEaSUREs/MEaSUREsAntVels.mat")
+        if isfile(measures_file)
+            velocity_data = get_measures_mat(measures_file)
+            xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
+            velocity_loaded = true
+        else
+            @warn "MEaSUREs .mat file not found: $measures_file"
+        end
     elseif veloc_data in ["Measures_2016/17", "Measures_2014/15", "Measures_phase_v1"]
         filename = get_measures_filename(veloc_data)
-        xx_v, yy_v, vx, vy = get_measures_velocities("Data/$filename")
+        filepath = "Data/$filename"
+        if isfile(filepath)
+            xx_v, yy_v, vx, vy = get_measures_velocities(filepath)
+            velocity_loaded = true
+        else
+            @warn "MEaSUREs NetCDF file not found: $filepath"
+        end
     else
-        error("Velocity dataset '$veloc_data' not recognized")
+        @warn "Velocity dataset '$veloc_data' not recognized"
+    end
+    
+    if !velocity_loaded
+        @warn "Using zero velocities"
+        xx_v = Gh.xx
+        yy_v = Gh.yy
+        vx = zeros(size(Gh.xx))
+        vy = zeros(size(Gh.yy))
     end
 
     # Apply subsampling if needed
@@ -233,14 +350,21 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = vy[1:sub_samp:end, 1:sub_samp:end]
     end
 
+    u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy)
+    v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy)
+    
     Gu = merge(Gu, (
-        u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy),
-        u_data_mask = .~isnan.(interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy))
+        u_data = u_data,
+        u_data_mask = .!isnan.(u_data),
+        uData = u_data,  # Alias for compatibility
+        uDataMask = .!isnan.(u_data)
     ))
 
     Gv = merge(Gv, (
-        v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy),
-        v_data_mask = .~isnan.(interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy))
+        v_data = v_data,
+        v_data_mask = .!isnan.(v_data),
+        vData = v_data,  # Alias for compatibility
+        vDataMask = .!isnan.(v_data)
     ))
 
     return Gu, Gv
@@ -253,24 +377,33 @@ Load 3D temperature data from various sources.
 """
 function load_temperature_data(Gh, params)
     temps = get(params, :temps, "BISICLES_8km")
+    temp_loaded = false
 
     if temps == "Frank"
-        temp_data = get_frank_temps()
-        temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
-        for i in 1:size(temp_data.FranksTemps, 1)
-            temperature[i, :, :] = interpolate_to_grid(
-                temp_data.xxTemp[:], temp_data.yyTemp[:], temp_data.FranksTemps[i, :][:],
-                Gh.xx, Gh.yy
-            )
+        frank_file = get(params, :frank_temps_file, "Data/FranksTemps.mat")
+        if isfile(frank_file)
+            temp_data = get_frank_temps(frank_file)
+            temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
+            for i in 1:size(temp_data.FranksTemps, 1)
+                # FranksTemps is (sigma_levels, ny, nx), so we need [i, :, :] to get the 2D slice
+                temperature[i, :, :] = interpolate_to_grid(
+                    temp_data.xxTemp[:], temp_data.yyTemp[:], temp_data.FranksTemps[i, :, :][:],
+                    Gh.xx, Gh.yy
+                )
+            end
+            sigmas = temp_data.sigmaTemp
+            temp_loaded = true
+        else
+            @warn "Frank temperature file not found: $frank_file"
         end
-        sigmas = temp_data.sigmaTemp
 
     elseif temps in ["BISICLES_8km", "BISICLES_1km"]
         filename = temps == "BISICLES_8km" ?
             "Data/antarctica-bisicles-xyzT-8km.nc" :
             "Data/ase-bisicles-xyzT-1km_corrected.nc"
 
-        bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps = get_bisicles_temps(filename)
+        if isfile(filename)
+            bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps = get_bisicles_temps(filename)
 
         bisicles_yy = repeat(bisicles_y, 1, length(bisicles_x))
         bisicles_xx = repeat(bisicles_x', length(bisicles_y), 1)
@@ -292,23 +425,24 @@ function load_temperature_data(Gh, params)
             temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
         end
         sigmas = bisicles_sigma
+        temp_loaded = true
+        else
+            @warn "BISICLES temperature file not found: $filename"
+        end
     else
-        error("Temperature dataset '$temps' not recognized")
+        @warn "Temperature dataset '$temps' not recognized"
+    end
+    
+    # Temperature data is required
+    if !temp_loaded
+        error("Temperature data is required but not found. Please provide one of:\n" *
+              "  - Franks temperature data at $(get(params, :frank_temps_file, "Data/FranksTemps.mat"))\n" *
+              "  - BISICLES temperature data (e.g. Data/antarctica-bisicles-xyzT-8km.nc or Data/ase-bisicles-xyzT-1km_corrected.nc))\n" *
+              "Set params[:temps] to 'Franks', 'BISICLES_8km', or 'BISICLES_1km' and ensure the corresponding file exists.")
     end
 
-    Gh = merge(Gh, (levels = (temperature = temperature, sigmas = sigmas)))
+    Gh = merge(Gh, (levels = (temperature = temperature, sigmas = sigmas),))
     return Gh
-end
-
-"""
-    interpolate_to_grid(x, y, values, xi, yi)
-
-Interpolate scattered data to a regular grid.
-"""
-function interpolate_to_grid(x, y, values, xi, yi)
-    # Use nearest neighbor interpolation for scattered data
-    itp = interpolate((x, y), values, Gridded(Linear()))
-    return itp(xi, yi)
 end
 
 function get_measures_filename(veloc_data)
