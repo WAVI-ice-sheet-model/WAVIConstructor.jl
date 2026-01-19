@@ -5,7 +5,6 @@ module InitBedMachine
 
 using NCDatasets
 using ArchGDAL
-using MAT
 using Interpolations
 using WAVI
 
@@ -16,7 +15,7 @@ using WAVIConstructor.DataLoading: get_arthern_accumulation, get_zwally_basins, 
 """
     init_bedmachine(params)
 
-Initialize computational grids and load all geophysical data using BedMachine v3.
+Initialise computational grids and load all geophysical data using BedMachine v3.
 Julia port of the MATLAB initBedmachineV3 function.
 
 # Arguments
@@ -45,8 +44,6 @@ function init_bedmachine(params)
     rockmask[mask .== 1] .= 1
 
     # Grid parameters
-
-    # BedMachine v3 grid parameters
     nx_full = 13333
     ny_full = 13333
     x0_full = -3333000 - 250
