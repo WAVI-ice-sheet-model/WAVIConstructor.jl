@@ -37,14 +37,16 @@ All configurations (data sources, domains, grid spacing, file output) are define
 ```julia
 using WAVIConstructor
 
-# Define all data contruction parameters
+# Define all data construction parameters
 params = default_constructor_params(
-    bedmachine_file = "Data/BedMachineAntarctica-v3.nc",
+    bedmachine_file = "/path/to/data/BedMachineAntarctica-v3.nc",
+    albmap_file = "/path/to/data/ALBMAPv1.nc",
+    zwally_file = "/path/to/data/DrainageBasins/ZwallyBasins.mat",
+    smith_dhdt_dir = "/path/to/data/Smith_2020_dhdt",  # Optional: directory with Smith dhdt data
+    measures_velocity_file = "/path/to/data/antarctica_ice_velocity_2016_2017_1km_v01.nc",  # Optional: MEaSUREs velocity
+    bisicles_temps_file = "/path/to/data/antarctica-bisicles-xyzT-8km.nc",  # Optional: BISICLES temperature
     dx = 10000.0,  # Grid spacing in metres
     basins = [1, 2, 3],  # Zwally drainage basins to include
-    dhdt_data = "Smith",  # Elevation change dataset
-    veloc_data = "Measures_2016/17",  # Velocity dataset
-    temps = "BISICLES_8km",  # Temperature dataset
     output_path = "wavi_inversion_input"
 )
 
@@ -73,9 +75,9 @@ You can also use the low-level data loading functions directly to inspect specif
 ```julia
 using WAVIConstructor.DataLoading
 
-# Load specific datasets
-bed, x, y, geoid, mask, thickness, surface, firn = get_bedmachine("Data/BedMachineAntarctica-v3.nc")
-xx, yy, vx, vy = get_measures_velocities("Data/velocity_file.nc")
+# Load specific datasets (all file paths should be full paths)
+bed, x, y, geoid, mask, thickness, surface, firn = get_bedmachine("/path/to/data/BedMachineAntarctica-v3.nc")
+xx, yy, vx, vy = get_measures_velocities("/path/to/data/velocity_file.nc")
 ```
 ## Outputs
 
@@ -98,28 +100,27 @@ Key parameters you can set:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `bedmachine_file` | Path to BedMachine NetCDF file | Required |
-| `dx` | Grid spacing (m) | Required |
+| `bedmachine_file` | Full path to BedMachine NetCDF file | `"Data/BedMachineAntarctica-v3.nc"` |
+| `albmap_file` | Full path to ALBMAP file | `"Data/ALBMAPv1.nc"` |
+| `zwally_file` | Full path to Zwally basins file | `"Data/DrainageBasins/ZwallyBasins.mat"` |
+| `arthern_file` | Full path to Arthern accumulation file | `"Data/amsr_accumulation_map.txt"` |
+| `smith_dhdt_dir` | Full path to directory containing Smith dh/dt files (optional) | `"Data/Smith_2020_dhdt"` |
+| `frank_temps_file` | Full path to Frank temperatures file (optional, alternative to bisicles_temps_file) | `"Data/FranksTemps.mat"` |
+| `measures_mat_file` | Full path to MEaSUREs .mat file (optional, alternative to measures_velocity_file) | `"Data/MEaSUREs/MEaSUREsAntVels.mat"` |
+| `measures_velocity_file` | Full path to MEaSUREs velocity NetCDF file (optional, alternative to measures_mat_file) | `"Data/antarctica_ice_velocity_2016_2017_1km_v01.nc"` |
+| `bisicles_temps_file` | Full path to BISICLES temperature file (optional, alternative to frank_temps_file) | `"Data/antarctica-bisicles-xyzT-8km.nc"` |
+| `dx` | Grid spacing (m) | `10000.0` |
 | `basins` | Zwally basin IDs to include | `1:27` (all) |
-| `dhdt_data` | Elevation change dataset | `"Smith"` |
-| `smith_dhdt_dir` | Directory containing Smith dh/dt files | `"Data/Smith_2020_dhdt"` |
-| `veloc_data` | Velocity dataset | `"Measures_2016/17"` |
-| `temps` | Temperature dataset | `"BISICLES_8km"` |
-| `output_path` | Directory for output files | `"outputs"` |
+| `output_path` | Directory for output files | `"wavi_input"` |
 | `clip_edge_padding` | Edge padding when clipping | `3` |
 | `density_ice` | Ice density (kg/m³) | `918.0` |
 | `density_ocean` | Ocean density (kg/m³) | `1028.0` |
 | `min_thick` | Minimum ice thickness (m) | `50.0` |
 
-### Velocity Dataset Options
-
-- `"Measures"`: MEaSUREs from .mat file
-
-### Temperature Dataset Options
-
-- `"Frank"`: Frank's temperature data (.mat file)
-- `"BISICLES_8km"`: BISICLES 8km resolution
-- `"BISICLES_1km"`: BISICLES 1km resolution
+### Dataset options:
+- Temperature data: Choose between `frank_temps_file` (Frank's temperature data) or `bisicles_temps_file` (BISICLES temperature data). Temperature data is required - you must provide one of these.
+- Velocity data: Choose between `measures_mat_file` (MEaSUREs .mat format) or `measures_velocity_file` (MEaSUREs NetCDF format). If neither is provided, zero velocities will be used.
+- Elevation change data: Provide `smith_dhdt_dir` to use Smith et al. 2020 elevation change data. If not provided, zeros will be used.
 
 ## Obtaining Data
 TBC
