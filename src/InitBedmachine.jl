@@ -10,7 +10,7 @@ using Interpolations
 using WAVI
 
 using WAVIConstructor.DataLoading: get_arthern_accumulation, get_zwally_basins, get_albmap, 
-    get_bisicles_temps, get_frank_temps, get_measures_velocities, get_measures_mat, 
+    get_bisicles_temps, get_frank_temps, get_measures_velocities, 
     get_smith_dhdt, interpolate_to_grid, get_bedmachine
 
 """
@@ -305,21 +305,13 @@ function load_velocity_data(Gu, Gv, Gh, params)
 
     velocity_loaded = false
     
-    # Try measures_mat_file first (if provided and exists)
-    measures_mat_file = get(params, :measures_mat_file, "Data/MEaSUREs/MEaSUREsAntVels.mat")
-    if measures_mat_file != "" && isfile(measures_mat_file)
-        velocity_data = get_measures_mat(measures_mat_file)
-        xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
+    # Try measures_velocity_file (if provided and exists)
+    measures_velocity_file = get(params, :measures_velocity_file, "Data/antarctica_ice_velocity_2016_2017_1km_v01.nc")
+    if measures_velocity_file != "" && isfile(measures_velocity_file)
+        xx_v, yy_v, vx, vy = get_measures_velocities(measures_velocity_file)
         velocity_loaded = true
-    # Else try measures_velocity_file (if provided and exists)
-    else
-        measures_velocity_file = get(params, :measures_velocity_file, "Data/antarctica_ice_velocity_2016_2017_1km_v01.nc")
-        if measures_velocity_file != "" && isfile(measures_velocity_file)
-            xx_v, yy_v, vx, vy = get_measures_velocities(measures_velocity_file)
-            velocity_loaded = true
-        elseif measures_velocity_file != ""
-            @warn "MEaSUREs velocity file not found: $measures_velocity_file"
-        end
+    elseif measures_velocity_file != ""
+        @warn "MEaSUREs velocity file not found: $measures_velocity_file"
     end
     
     if !velocity_loaded

@@ -13,7 +13,7 @@ Struct defining all parameters needed for WAVI data construction.
 # Fields
 
 ## File Paths
-All file paths should be full paths (absolute or relative to current working directory), not relative to a "Data/" folder.
+All file paths should be full paths (absolute or relative to current working directory).
 
 - `bedmachine_file::String`: Full path to BedMachine NetCDF file
 - `smith_dhdt_dir::String`: Full path to directory with Smith dhdt data
@@ -21,8 +21,7 @@ All file paths should be full paths (absolute or relative to current working dir
 - `albmap_file::String`: Full path to ALBMAP file
 - `arthern_file::String`: Full path to Arthern accumulation file
 - `frank_temps_file::String`: Full path to Frank temperatures file (optional, alternative to bisicles_temps_file)
-- `measures_mat_file::String`: Full path to MEaSUREs .mat file (optional, alternative to measures_velocity_file)
-- `measures_velocity_file::String`: Full path to MEaSUREs velocity NetCDF file (optional, alternative to measures_mat_file)
+- `measures_velocity_file::String`: Full path to MEaSUREs velocity NetCDF file (optional)
 - `bisicles_temps_file::String`: Full path to BISICLES temperature file (optional, alternative to frank_temps_file)
 
 ## Grid Parameters
@@ -42,15 +41,14 @@ All file paths should be full paths (absolute or relative to current working dir
 - `sub_samp::Int`: Velocity subsampling factor
 """
 Base.@kwdef struct ConstructorParams
-    # File paths (all should be full paths, defaults assume Data/ folder for backward compatibility)
+    # File paths (all should be full paths, defaults assume Data/ folder)
     bedmachine_file::String = "Data/BedMachineAntarctica-v3.nc"
     smith_dhdt_dir::String = "Data/Smith_2020_dhdt"
     zwally_file::String = "Data/DrainageBasins/ZwallyBasins.mat"
     albmap_file::String = "Data/ALBMAPv1.nc"
     arthern_file::String = "Data/amsr_accumulation_map.txt"
     frank_temps_file::String = "Data/FranksTemps.mat"
-    measures_mat_file::String = "Data/MEaSUREs/MEaSUREsAntVels.mat"
-    measures_velocity_file::String = "Data/antarctica_ice_velocity_2016_2017_1km_v01.nc"
+    measures_velocity_file::String = "Data/antarctica_ice_velocity_2014_2015_1km_v01.nc"
     bisicles_temps_file::String = "Data/antarctica-bisicles-xyzT-8km.nc"
     
     # Grid parameters
@@ -90,7 +88,6 @@ function to_dict(params::ConstructorParams)
         :albmap_file => params.albmap_file,
         :arthern_file => params.arthern_file,
         :frank_temps_file => params.frank_temps_file,
-        :measures_mat_file => params.measures_mat_file,
         :measures_velocity_file => params.measures_velocity_file,
         :bisicles_temps_file => params.bisicles_temps_file,
         :dx => params.dx,
@@ -149,7 +146,6 @@ function minimal_constructor_params(; kwargs...)
         dx = 32000.0,
         basins = 0:27,
         smith_dhdt_dir = "",  # Empty string means skip dhdt
-        measures_mat_file = "",  # Empty string means skip velocity
         measures_velocity_file = "",  # Empty string means skip velocity
         output_path = "wavi_input_test",
         kwargs...

@@ -106,8 +106,7 @@ Key parameters you can set:
 | `arthern_file` | Full path to Arthern accumulation file | `"Data/amsr_accumulation_map.txt"` |
 | `smith_dhdt_dir` | Full path to directory containing Smith dh/dt files (optional) | `"Data/Smith_2020_dhdt"` |
 | `frank_temps_file` | Full path to Frank temperatures file (optional, alternative to bisicles_temps_file) | `"Data/FranksTemps.mat"` |
-| `measures_mat_file` | Full path to MEaSUREs .mat file (optional, alternative to measures_velocity_file) | `"Data/MEaSUREs/MEaSUREsAntVels.mat"` |
-| `measures_velocity_file` | Full path to MEaSUREs velocity NetCDF file (optional, alternative to measures_mat_file) | `"Data/antarctica_ice_velocity_2016_2017_1km_v01.nc"` |
+| `measures_velocity_file` | Full path to MEaSUREs velocity NetCDF file (optional) | `"Data/antarctica_ice_velocity_2016_2017_1km_v01.nc"` |
 | `bisicles_temps_file` | Full path to BISICLES temperature file (optional, alternative to frank_temps_file) | `"Data/antarctica-bisicles-xyzT-8km.nc"` |
 | `dx` | Grid spacing (m) | `10000.0` |
 | `basins` | Zwally basin IDs to include | `1:27` (all) |
@@ -119,7 +118,7 @@ Key parameters you can set:
 
 ### Dataset options:
 - Temperature data: Choose between `frank_temps_file` (Frank's temperature data) or `bisicles_temps_file` (BISICLES temperature data). Temperature data is required - you must provide one of these.
-- Velocity data: Choose between `measures_mat_file` (MEaSUREs .mat format) or `measures_velocity_file` (MEaSUREs NetCDF format). If neither is provided, zero velocities will be used.
+- Velocity data: Provide `measures_velocity_file` (MEaSUREs NetCDF format). If not provided, zero velocities will be used.
 - Elevation change data: Provide `smith_dhdt_dir` to use Smith et al. 2020 elevation change data. If not provided, zeros will be used.
 
 ## Obtaining Data

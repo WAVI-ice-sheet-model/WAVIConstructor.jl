@@ -150,34 +150,6 @@ end
         @test maximum(temp_data.FranksTemps) <= 300.0
     end
 
-    # Test get_measures_mat
-    mktempdir() do tmpdir
-        nx, ny = 5, 4
-        xx_v = repeat(collect(-3000000.0:100000.0:-2600000.0), 1, ny)
-        yy_v = repeat(collect(-3000000.0:100000.0:-2700000.0)', nx, 1)
-        vx = reshape(collect(10.0:1.0:(10.0 + nx*ny - 1)), nx, ny)
-        vy = reshape(collect(20.0:1.0:(20.0 + nx*ny - 1)), nx, ny)
-        
-        mockfile = create_mock_matfile(tmpdir, "mock_MEaSUREsAntVels.mat",
-            [("xx_v", xx_v), ("yy_v", yy_v), ("vx", vx), ("vy", vy)]
-        )
-
-        velocity_data = get_measures_mat(mockfile)
-
-        @test size(velocity_data.xx_v) == (nx, ny)
-        @test size(velocity_data.yy_v) == (nx, ny)
-        @test size(velocity_data.vx) == (nx, ny)
-        @test size(velocity_data.vy) == (nx, ny)
-        @test all(velocity_data.xx_v .== xx_v)
-        @test all(velocity_data.yy_v .== yy_v)
-        @test all(velocity_data.vx .== vx)
-        @test all(velocity_data.vy .== vy)
-        @test minimum(velocity_data.vx) >= 10.0
-        @test maximum(velocity_data.vx) <= 30.0
-        @test minimum(velocity_data.vy) >= 20.0
-        @test maximum(velocity_data.vy) <= 40.0
-    end
-
     # Test get_measures_velocities
     mktempdir() do tmpdir
         mockfile = joinpath(tmpdir, "mock_measures.nc")
