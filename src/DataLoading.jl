@@ -6,7 +6,7 @@ using MAT
 using NearestNeighbors
 import DelimitedFiles: readdlm
 
-export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, get_arthern_accumulation, get_zwally_basins, get_frank_temps, get_measures_mat
+export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, get_arthern_accumulation, get_zwally_basins, get_frank_temps
 
 
 """
@@ -516,41 +516,6 @@ function get_frank_temps(filename::String="Data/FranksTemps.mat")
             xxTemp = xxTemp,
             yyTemp = yyTemp,
             sigmaTemp = vec(sigmaTemp)
-        )
-    end
-end
-
-"""
-    get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
-
-Load MEaSUREs ice velocity data from a MATLAB .mat file.
-
-# Arguments
-- `filename::String`: Path to the MEaSUREs velocity .mat file (default: "Data/MEaSUREs/MEaSUREsAntVels.mat")
-
-# Returns
-A NamedTuple containing:
-- `xx_v`: 2D grid of x coordinates
-- `yy_v`: 2D grid of y coordinates
-- `vx`: X-component velocity data
-- `vy`: Y-component velocity data
-
-# Notes
-- The .mat file should contain variables: `xx_v`, `yy_v`, `vx`, `vy`
-- This is the older MEaSUREs dataset format (Measures_1)
-"""
-function get_measures_mat(filename::String="Data/MEaSUREs/MEaSUREsAntVels.mat")
-    matopen(filename) do mat_file
-        xx_v = read(mat_file, "xx_v")
-        yy_v = read(mat_file, "yy_v")
-        vx = read(mat_file, "vx")
-        vy = read(mat_file, "vy")
-
-        return (
-            xx_v = xx_v,
-            yy_v = yy_v,
-            vx = vx,
-            vy = vy
         )
     end
 end

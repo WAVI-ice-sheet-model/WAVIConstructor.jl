@@ -13,21 +13,20 @@ Struct defining all parameters needed for WAVI data construction.
 # Fields
 
 ## File Paths
-- `bedmachine_file::String`: Path to BedMachine NetCDF file
-- `smith_dhdt_dir::String`: Directory with Smith dhdt data
-- `zwally_file::String`: Path to Zwally basins file
-- `albmap_file::String`: Path to ALBMAP file
-- `frank_temps_file::String`: Path to Frank temperatures file
-- `measures_mat_file::String`: Path to MEaSUREs .mat file
+All file paths should be full paths (absolute or relative to current working directory).
+
+- `bedmachine_file::String`: Full path to BedMachine NetCDF file
+- `smith_dhdt_dir::String`: Full path to directory with Smith dhdt data
+- `zwally_file::String`: Full path to Zwally basins file
+- `albmap_file::String`: Full path to ALBMAP file
+- `arthern_file::String`: Full path to Arthern accumulation file
+- `frank_temps_file::String`: Full path to Frank temperatures file (optional, alternative to bisicles_temps_file)
+- `measures_velocity_file::String`: Full path to MEaSUREs velocity NetCDF file (optional)
+- `bisicles_temps_file::String`: Full path to BISICLES temperature file (optional, alternative to frank_temps_file)
 
 ## Grid Parameters
 - `dx::Float64`: Grid spacing in meters
 - `basins`: Basin IDs to include (can be range or array)
-
-## Dataset Selection
-- `dhdt_data::String`: dhdt dataset to use ("Smith" or "none")
-- `veloc_data::String`: Velocity dataset ("Measures, or "none")
-- `temps::String`: Temperature dataset ("BISICLES_8km", "BISICLES_1km", "Frank")
 
 ## Output Parameters
 - `output_path::String`: Output directory for binary files
@@ -42,22 +41,19 @@ Struct defining all parameters needed for WAVI data construction.
 - `sub_samp::Int`: Velocity subsampling factor
 """
 Base.@kwdef struct ConstructorParams
-    # File paths
+    # File paths (all should be full paths, defaults assume Data/ folder)
     bedmachine_file::String = "Data/BedMachineAntarctica-v3.nc"
     smith_dhdt_dir::String = "Data/Smith_2020_dhdt"
     zwally_file::String = "Data/DrainageBasins/ZwallyBasins.mat"
     albmap_file::String = "Data/ALBMAPv1.nc"
+    arthern_file::String = "Data/amsr_accumulation_map.txt"
     frank_temps_file::String = "Data/FranksTemps.mat"
-    measures_mat_file::String = "Data/MEaSUREs/MEaSUREsAntVels.mat"
+    measures_velocity_file::String = "Data/antarctica_ice_velocity_2014_2015_1km_v01.nc"
+    bisicles_temps_file::String = "Data/antarctica-bisicles-xyzT-8km.nc"
     
     # Grid parameters
     dx::Float64 = 10000.0
     basins::Union{UnitRange{Int}, Vector{Int}, AbstractVector{Int}} = 1:27
-    
-    # Dataset selection
-    dhdt_data::String = "Smith"
-    veloc_data::String = "Measures_2016/17"
-    temps::String = "BISICLES_8km"
     
     # Output parameters
     output_path::String = "wavi_input"
@@ -90,13 +86,12 @@ function to_dict(params::ConstructorParams)
         :smith_dhdt_dir => params.smith_dhdt_dir,
         :zwally_file => params.zwally_file,
         :albmap_file => params.albmap_file,
+        :arthern_file => params.arthern_file,
         :frank_temps_file => params.frank_temps_file,
-        :measures_mat_file => params.measures_mat_file,
+        :measures_velocity_file => params.measures_velocity_file,
+        :bisicles_temps_file => params.bisicles_temps_file,
         :dx => params.dx,
         :basins => params.basins,
-        :dhdt_data => params.dhdt_data,
-        :veloc_data => params.veloc_data,
-        :temps => params.temps,
         :output_path => params.output_path,
         :clip_edge_padding => params.clip_edge_padding,
         :density_ice => params.density_ice,
@@ -150,9 +145,8 @@ function minimal_constructor_params(; kwargs...)
     return ConstructorParams(;
         dx = 32000.0,
         basins = 0:27,
-        dhdt_data = "none",
-        veloc_data = "none",
-        temps = "BISICLES_8km",
+        smith_dhdt_dir = "",  # Empty string means skip dhdt
+        measures_velocity_file = "",  # Empty string means skip velocity
         output_path = "wavi_input_test",
         kwargs...
     )

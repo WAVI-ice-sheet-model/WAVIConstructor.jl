@@ -5,18 +5,17 @@ module InitBedMachine
 
 using NCDatasets
 using ArchGDAL
-using MAT
 using Interpolations
 using WAVI
 
 using WAVIConstructor.DataLoading: get_arthern_accumulation, get_zwally_basins, get_albmap, 
-    get_bisicles_temps, get_frank_temps, get_measures_velocities, get_measures_mat, 
+    get_bisicles_temps, get_frank_temps, get_measures_velocities, 
     get_smith_dhdt, interpolate_to_grid, get_bedmachine
 
 """
     init_bedmachine(params)
 
-Initialize computational grids and load all geophysical data using BedMachine v3.
+Initialise computational grids and load all geophysical data using BedMachine v3.
 Julia port of the MATLAB initBedmachineV3 function.
 
 # Arguments
@@ -45,8 +44,6 @@ function init_bedmachine(params)
     rockmask[mask .== 1] .= 1
 
     # Grid parameters
-
-    # BedMachine v3 grid parameters
     nx_full = 13333
     ny_full = 13333
     x0_full = -3333000 - 250
@@ -114,11 +111,10 @@ function init_bedmachine(params)
         ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2))
     ))
     
-    # Load dhdt data if specified
-    dhdt_data = get(params, :dhdt_data, "Smith")
+    # Load dhdt data if smith_dhdt_dir is provided
+    smith_dir = get(params, :smith_dhdt_dir, "Data/Smith_2020_dhdt")
     
-    if dhdt_data == "Smith"
-        smith_dir = get(params, :smith_dhdt_dir, "Data/Smith_2020_dhdt")
+    if smith_dir != "" && isdir(smith_dir)
         smith_data = get_smith_dhdt(smith_dir=smith_dir)
         
         if smith_data !== nothing
@@ -151,7 +147,7 @@ function init_bedmachine(params)
             Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
         end
     else
-        # Return zeros for other datasets (not implemented yet)
+        # Return zeros if directory not provided or doesn't exist
         Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
     end
     
@@ -302,31 +298,17 @@ end
 Load MEaSUREs ice velocity data.
 """
 function load_velocity_data(Gu, Gv, Gh, params)
-    veloc_data = get(params, :veloc_data, "Measures_2014/15")
     sub_samp = get(params, :sub_samp, 8)
 
     velocity_loaded = false
     
-    if veloc_data == "Measures_1"
-        measures_file = get(params, :measures_mat_file, "Data/MEaSUREs/MEaSUREsAntVels.mat")
-        if isfile(measures_file)
-            velocity_data = get_measures_mat(measures_file)
-            xx_v, yy_v, vx, vy = velocity_data.xx_v, velocity_data.yy_v, velocity_data.vx, velocity_data.vy
-            velocity_loaded = true
-        else
-            @warn "MEaSUREs .mat file not found: $measures_file"
-        end
-    elseif veloc_data in ["Measures_2016/17", "Measures_2014/15", "Measures_phase_v1"]
-        filename = get_measures_filename(veloc_data)
-        filepath = "Data/$filename"
-        if isfile(filepath)
-            xx_v, yy_v, vx, vy = get_measures_velocities(filepath)
-            velocity_loaded = true
-        else
-            @warn "MEaSUREs NetCDF file not found: $filepath"
-        end
-    else
-        @warn "Velocity dataset '$veloc_data' not recognized"
+    # Try measures_velocity_file (if provided and exists)
+    measures_velocity_file = get(params, :measures_velocity_file, "Data/antarctica_ice_velocity_2016_2017_1km_v01.nc")
+    if measures_velocity_file != "" && isfile(measures_velocity_file)
+        xx_v, yy_v, vx, vy = get_measures_velocities(measures_velocity_file)
+        velocity_loaded = true
+    elseif measures_velocity_file != ""
+        @warn "MEaSUREs velocity file not found: $measures_velocity_file"
     end
     
     if !velocity_loaded
@@ -376,82 +358,64 @@ end
 Load 3D temperature data from various sources.
 """
 function load_temperature_data(Gh, params)
-    temps = get(params, :temps, "BISICLES_8km")
     temp_loaded = false
 
-    if temps == "Frank"
-        frank_file = get(params, :frank_temps_file, "Data/FranksTemps.mat")
-        if isfile(frank_file)
-            temp_data = get_frank_temps(frank_file)
-            temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
-            for i in 1:size(temp_data.FranksTemps, 1)
-                # FranksTemps is (sigma_levels, ny, nx), so we need [i, :, :] to get the 2D slice
-                temperature[i, :, :] = interpolate_to_grid(
-                    temp_data.xxTemp[:], temp_data.yyTemp[:], temp_data.FranksTemps[i, :, :][:],
-                    Gh.xx, Gh.yy
-                )
+    # Try frank_temps_file first (if provided and exists)
+    frank_file = get(params, :frank_temps_file, "Data/FranksTemps.mat")
+    if frank_file != "" && isfile(frank_file)
+        temp_data = get_frank_temps(frank_file)
+        temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
+        for i in 1:size(temp_data.FranksTemps, 1)
+            # FranksTemps is (sigma_levels, ny, nx), so we need [i, :, :] to get the 2D slice
+            temperature[i, :, :] = interpolate_to_grid(
+                temp_data.xxTemp[:], temp_data.yyTemp[:], temp_data.FranksTemps[i, :, :][:],
+                Gh.xx, Gh.yy
+            )
+        end
+        sigmas = temp_data.sigmaTemp
+        temp_loaded = true
+    # Else try bisicles_temps_file (if provided and exists)
+    else
+        bisicles_file = get(params, :bisicles_temps_file, "Data/antarctica-bisicles-xyzT-8km.nc")
+        if bisicles_file != "" && isfile(bisicles_file)
+            bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps = get_bisicles_temps(bisicles_file)
+
+            bisicles_yy = repeat(bisicles_y, 1, length(bisicles_x))
+            bisicles_xx = repeat(bisicles_x', length(bisicles_y), 1)
+
+            temperature = zeros(length(bisicles_sigma), Gh.nx, Gh.ny)
+            bisicles_mask_full = zeros(length(bisicles_sigma), size(bisicles_xx, 1), size(bisicles_xx, 2))
+
+            for i in 1:length(bisicles_sigma)
+                bisicles_mask = bisicles_temps[i, :, :] .> 273.1480
+                bisicles_mask_full[i, :, :] = bisicles_mask
+                bisicles_temps[i, bisicles_mask_full[i, :, :] .== 1] .= NaN
+
+                this_temp = bisicles_temps[i, :, :]
+                valid_mask = .~isnan.(this_temp)
+                xx_valid = bisicles_xx[valid_mask]
+                yy_valid = bisicles_yy[valid_mask]
+                temp_valid = this_temp[valid_mask]
+
+                temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
             end
-            sigmas = temp_data.sigmaTemp
+            sigmas = bisicles_sigma
             temp_loaded = true
         else
-            @warn "Frank temperature file not found: $frank_file"
+            @warn "BISICLES temperature file not found: $bisicles_file"
         end
-
-    elseif temps in ["BISICLES_8km", "BISICLES_1km"]
-        filename = temps == "BISICLES_8km" ?
-            "Data/antarctica-bisicles-xyzT-8km.nc" :
-            "Data/ase-bisicles-xyzT-1km_corrected.nc"
-
-        if isfile(filename)
-            bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps = get_bisicles_temps(filename)
-
-        bisicles_yy = repeat(bisicles_y, 1, length(bisicles_x))
-        bisicles_xx = repeat(bisicles_x', length(bisicles_y), 1)
-
-        temperature = zeros(length(bisicles_sigma), Gh.nx, Gh.ny)
-        bisicles_mask_full = zeros(length(bisicles_sigma), size(bisicles_xx, 1), size(bisicles_xx, 2))
-
-        for i in 1:length(bisicles_sigma)
-            bisicles_mask = bisicles_temps[i, :, :] .> 273.1480
-            bisicles_mask_full[i, :, :] = bisicles_mask
-            bisicles_temps[i, bisicles_mask_full[i, :, :] .== 1] .= NaN
-
-            this_temp = bisicles_temps[i, :, :]
-            valid_mask = .~isnan.(this_temp)
-            xx_valid = bisicles_xx[valid_mask]
-            yy_valid = bisicles_yy[valid_mask]
-            temp_valid = this_temp[valid_mask]
-
-            temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
-        end
-        sigmas = bisicles_sigma
-        temp_loaded = true
-        else
-            @warn "BISICLES temperature file not found: $filename"
-        end
-    else
-        @warn "Temperature dataset '$temps' not recognized"
     end
     
     # Temperature data is required
     if !temp_loaded
         error("Temperature data is required but not found. Please provide one of:\n" *
-              "  - Franks temperature data at $(get(params, :frank_temps_file, "Data/FranksTemps.mat"))\n" *
-              "  - BISICLES temperature data (e.g. Data/antarctica-bisicles-xyzT-8km.nc or Data/ase-bisicles-xyzT-1km_corrected.nc))\n" *
-              "Set params[:temps] to 'Franks', 'BISICLES_8km', or 'BISICLES_1km' and ensure the corresponding file exists.")
+              "  - Frank temperature file: $(get(params, :frank_temps_file, "Data/FranksTemps.mat"))\n" *
+              "  - BISICLES temperature file: $(get(params, :bisicles_temps_file, "Data/antarctica-bisicles-xyzT-8km.nc"))\n" *
+              "Ensure the file exists and is accessible.")
     end
 
     Gh = merge(Gh, (levels = (temperature = temperature, sigmas = sigmas),))
     return Gh
-end
-
-function get_measures_filename(veloc_data)
-    filename_map = Dict(
-        "Measures_2016/17" => "antarctica_ice_velocity_2016_2017_1km_v01.nc",
-        "Measures_2014/15" => "antarctica_ice_velocity_2014_2015_1km_v01.nc",
-        "Measures_phase_v1" => "antarctic_ice_vel_phase_map_v01.nc"
-    )
-    return get(filename_map, veloc_data, "")
 end
 
 end # module InitBedMachine
