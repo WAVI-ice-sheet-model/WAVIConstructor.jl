@@ -29,3 +29,4 @@ JuliaLocalPreferences.toml
 
 # Custom for this repo
 /Data
+/outputs
