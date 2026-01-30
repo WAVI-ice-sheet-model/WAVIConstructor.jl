@@ -404,34 +404,73 @@ end
 
 Load Arthern accumulation data from a text file.
 
+Data source: Arthern, R. J., D. P. Winebrenner, and D. G. Vaughan (2006), 
+"Antarctic snow accumulation mapped using polarization of 4.3-cm wavelength microwave emission",
+J. Geophys. Res., 111, D06107, doi:10.1029/2004JD005667
+
 # Arguments
 - `filename::String`: Path to the Arthern accumulation text file (default: "Data/amsr_accumulation_map.txt")
 
 # Returns
 A tuple containing:
-- `aa_lat`: Latitude values
-- `aa_lon`: Longitude values
-- `aa_x`: X-coordinate values (in meters)
-- `aa_y`: Y-coordinate values (in meters)
-- `aa_acc`: Accumulation values (converted to ice equivalent, divided by 917)
-- `aa_err`: Error values
+- `aa_lat`: Latitude values (degrees)
+- `aa_lon`: Longitude values (degrees, 0-360 convention)
+- `aa_x`: X-coordinate values in Polar Stereographic projection (meters)
+- `aa_y`: Y-coordinate values in Polar Stereographic projection (meters)
+- `aa_acc`: Accumulation values (converted to ice equivalent, divided by 917 kg/m³)
+- `aa_err`: Estimated RMS error at 100 km scale (% of accumulation)
+
+# Coordinate System
+- Polar Stereographic projection
+- Latitude of true scale: 71°S
+- Ellipsoid: WGS84
+- Effective resolution: ~100 km
 
 # Notes
-- The file should have 21 header lines
-- Data is space-delimited with 6 columns
-- Accumulation values are converted from water equivalent to ice equivalent (divided by 917 kg/m³)
+- The file should have 21 header lines containing metadata
+- Data is space-delimited with 6 columns: lat, lon, x, y, accumulation, error
+- Accumulation values are converted from water equivalent (kg/m²/a) to ice equivalent (m/a)
 - Rows with NaN accumulation values are filtered out
+- Warning: values for locations subject to melt may be unreliable
 """
 function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
-    # Read the file, skipping 21 header lines
-    data = readdlm(filename, ' ', Float64; skipstart=21)
-
-    aa_lat = data[:, 1]
-    aa_lon = data[:, 2]
-    aa_x = data[:, 3]
-    aa_y = data[:, 4]
-    aa_acc_raw = data[:, 5]
-    aa_err = data[:, 6]
+    # Read the file content, handling potential Windows line endings
+    content = read(filename, String)
+    content = replace(content, "\r\n" => "\n")  # Convert Windows to Unix line endings
+    content = replace(content, "\r" => "\n")    # Handle old Mac line endings
+    
+    # Split into lines and skip header
+    lines = split(content, '\n')
+    data_lines = lines[22:end]  # Skip 21 header lines (1-indexed)
+    
+    # Parse data - handle multiple spaces by splitting on whitespace
+    aa_lat = Float64[]
+    aa_lon = Float64[]
+    aa_x = Float64[]
+    aa_y = Float64[]
+    aa_acc_raw = Float64[]
+    aa_err = Float64[]
+    
+    for line in data_lines
+        stripped = strip(line)
+        isempty(stripped) && continue
+        
+        # Split on whitespace (handles multiple spaces)
+        parts = split(stripped)
+        length(parts) < 6 && continue
+        
+        try
+            push!(aa_lat, parse(Float64, parts[1]))
+            push!(aa_lon, parse(Float64, parts[2]))
+            push!(aa_x, parse(Float64, parts[3]))
+            push!(aa_y, parse(Float64, parts[4]))
+            push!(aa_acc_raw, parse(Float64, parts[5]))
+            push!(aa_err, parse(Float64, parts[6]))
+        catch e
+            # Skip lines that can't be parsed (e.g., malformed data)
+            continue
+        end
+    end
 
     # Filter out rows where accumulation is NaN
     valid_mask = .!isnan.(aa_acc_raw)
@@ -450,12 +489,12 @@ function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.t
 end
 
 """
-    get_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+    get_zwally_basins(filename::String="Data/ZwallyBasins.mat")
 
 Load Zwally drainage basins from a MATLAB .mat file.
 
 # Arguments
-- `filename::String`: Path to the Zwally basins .mat file (default: "Data/DrainageBasins/ZwallyBasins.mat")
+- `filename::String`: Path to the Zwally basins .mat file (default: "Data/ZwallyBasins.mat")
 
 # Returns
 A tuple containing:
@@ -467,7 +506,7 @@ A tuple containing:
 - The .mat file should contain variables: `xxZwallyBasins`, `yyZwallyBasins`, `ZwallyBasins`
 - Only points where `ZwallyBasins > 0` are returned
 """
-function get_zwally_basins(filename::String="Data/DrainageBasins/ZwallyBasins.mat")
+function get_zwally_basins(filename::String="Data/ZwallyBasins.mat")
     matopen(filename) do mat_file
         xx_zwally_full = read(mat_file, "xxZwallyBasins")
         yy_zwally_full = read(mat_file, "yyZwallyBasins")

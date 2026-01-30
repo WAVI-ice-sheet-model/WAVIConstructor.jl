@@ -44,7 +44,7 @@ Base.@kwdef struct ConstructorParams
     # File paths (all should be full paths, defaults assume Data/ folder)
     bedmachine_file::String = "Data/BedMachineAntarctica-v3.nc"
     smith_dhdt_dir::String = "Data/Smith_2020_dhdt"
-    zwally_file::String = "Data/DrainageBasins/ZwallyBasins.mat"
+    zwally_file::String = "Data/ZwallyBasins.mat"
     albmap_file::String = "Data/ALBMAPv1.nc"
     arthern_file::String = "Data/amsr_accumulation_map.txt"
     frank_temps_file::String = "Data/FranksTemps.mat"
