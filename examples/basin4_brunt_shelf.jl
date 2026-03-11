@@ -1,18 +1,18 @@
-# Basin 19 Example
+# Basin 4 Example
 #
-# This example demonstrates how to set up WAVI model inputs for Basin 19.
+# This example demonstrates how to set up WAVI model inputs for Basin 4.
 #
 # Configuration:
 #   - Resolution: 8 km (dx = 8000.0 m) - for initial testing
 #   - Includes: MEaSUREs velocity data, Smith 2020 dh/dt, BISICLES temperatures
-#   - Output: outputs/basin19_brunt_shelf/
+#   - Output: outputs/basin4_brunt_shelf/
 
 using WAVIConstructor
 
 # Get the package root directory (parent of examples/)
 const PACKAGE_ROOT = dirname(@__DIR__)
 const DATA_DIR = joinpath(PACKAGE_ROOT, "Data")
-const OUTPUT_DIR = joinpath(PACKAGE_ROOT, "outputs", "basin19_brunt_shelf")
+const OUTPUT_DIR = joinpath(PACKAGE_ROOT, "outputs", "basin4_brunt_shelf")
 
 # Parameter Configuration
 
@@ -42,8 +42,8 @@ params = default_constructor_params(
     # Grid spacing: 8 km for initial testing
     dx = 8000.0,
     
-    # Basin selection: Basin 19 = Brunt Ice Shelf region
-    basins = [19],
+    # Basin selection: Basin 4 = Brunt Ice Shelf region
+    basins = [4],
     
     # Velocity subsampling factor (8 for 8 km grid from 1 km source)
     sub_samp = 8,
