@@ -215,7 +215,7 @@ function load_additional_datasets(Gh, params)
     end
 
     # Load Zwally basins if file exists
-    zwally_file = get(params, :zwally_file, "Data/DrainageBasins/ZwallyBasins.mat")
+    zwally_file = get(params, :zwally_file, "Data/ZwallyBasins.mat")
     if isfile(zwally_file)
         xx_zwally, yy_zwally, zwally_basins = get_zwally_basins(zwally_file)
         Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy),))

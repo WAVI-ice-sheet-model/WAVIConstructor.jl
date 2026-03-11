@@ -41,7 +41,7 @@ using WAVIConstructor
 params = default_constructor_params(
     bedmachine_file = "/path/to/data/BedMachineAntarctica-v3.nc",
     albmap_file = "/path/to/data/ALBMAPv1.nc",
-    zwally_file = "/path/to/data/DrainageBasins/ZwallyBasins.mat",
+    zwally_file = "/path/to/data/ZwallyBasins.mat",
     smith_dhdt_dir = "/path/to/data/Smith_2020_dhdt",  # Optional: directory with Smith dhdt data
     measures_velocity_file = "/path/to/data/antarctica_ice_velocity_2016_2017_1km_v01.nc",  # Optional: MEaSUREs velocity
     bisicles_temps_file = "/path/to/data/antarctica-bisicles-xyzT-8km.nc",  # Optional: BISICLES temperature
@@ -102,7 +102,7 @@ Key parameters you can set:
 |-----------|-------------|---------|
 | `bedmachine_file` | Full path to BedMachine NetCDF file | `"Data/BedMachineAntarctica-v3.nc"` |
 | `albmap_file` | Full path to ALBMAP file | `"Data/ALBMAPv1.nc"` |
-| `zwally_file` | Full path to Zwally basins file | `"Data/DrainageBasins/ZwallyBasins.mat"` |
+| `zwally_file` | Full path to Zwally basins file | `"Data/ZwallyBasins.mat"` |
 | `arthern_file` | Full path to Arthern accumulation file | `"Data/amsr_accumulation_map.txt"` |
 | `smith_dhdt_dir` | Full path to directory containing Smith dh/dt files (optional) | `"Data/Smith_2020_dhdt"` |
 | `frank_temps_file` | Full path to Frank temperatures file (optional, alternative to bisicles_temps_file) | `"Data/FranksTemps.mat"` |
