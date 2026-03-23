@@ -1,6 +1,6 @@
 # API Reference
 
-This page documents the main exported functions and types in WAVIConstructor.jl. Each dataset has its own label type (e.g. `BedMachineV3`, `BISICLESTemps`), and passing that label to `load_data` automatically calls the right loading code for it.
+This page documents the main exported functions and types in WAVIConstructor.jl. Each dataset has its own label type (e.g. `BedMachineV3`, `BISICLESTemps`), and passing that label to `load_data` which calls the right loading code for it.
 
 ## Main Workflow Functions
 
@@ -45,6 +45,16 @@ Each data category has its own abstract subtype of `DataSource`:
 - `AccumulationSource` — snow accumulation (e.g. `ArthernAccumulation`)
 - `DhDtSource` — elevation-change rates (e.g. `SmithDhdt`)
 - `BasinSource` — drainage basin delineations (e.g. `ZwallyBasins`)
+
+```@docs
+WAVIConstructor.DataSources.BedSource
+WAVIConstructor.DataSources.SurfaceTempSource
+WAVIConstructor.DataSources.TemperatureSource
+WAVIConstructor.DataSources.VelocitySource
+WAVIConstructor.DataSources.AccumulationSource
+WAVIConstructor.DataSources.DhDtSource
+WAVIConstructor.DataSources.BasinSource
+```
 
 ### Concrete source singletons
 
