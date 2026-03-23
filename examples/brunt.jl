@@ -18,8 +18,8 @@ params = default_constructor_params(
     # Zwally drainage basins (IDs 1-27)
     basins = (ZwallyBasins(), "Data/ZwallyBasins.mat"),
 
-    # ALBMAP: mean annual temperature
-    geometry = (ALBMAPv1(), "Data/ALBMAPv1.nc"),
+    # ALBMAP: mean annual surface temperature
+    surface_temp = (ALBMAPv1(), "Data/ALBMAPv1.nc"),
 
     # Arthern accumulation data
     accumulation = (ArthernAccumulation(), "Data/amsr_accumulation_map.txt"),

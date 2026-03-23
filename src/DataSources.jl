@@ -32,7 +32,7 @@ subtype.
 """
 abstract type DataSource end
 
-"""Bed topography / geometry sources (e.g. BedMachine)."""
+"""Bed topography sources (e.g. BedMachine)."""
 abstract type BedSource       <: DataSource end
 
 """Mean annual surface temperature sources (e.g. ALBMAP)."""
@@ -77,7 +77,7 @@ default_path(::NoData) = ""
 struct BedMachineV3 <: BedSource end
 default_path(::BedMachineV3) = "Data/BedMachineAntarctica-v3.nc"
 
-"""ALBMAP v1 Antarctic geometry / mean-annual temperature."""
+"""ALBMAP v1 Antarctic mean-annual surface temperature."""
 struct ALBMAPv1 <: SurfaceTempSource end
 default_path(::ALBMAPv1) = "Data/ALBMAPv1.nc"
 

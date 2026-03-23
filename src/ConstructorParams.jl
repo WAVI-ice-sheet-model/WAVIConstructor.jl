@@ -21,7 +21,7 @@ Use `NoData()` for optional categories you want to skip.
 | Field          | Category              | Required? | Default source          |
 |:---------------|:----------------------|:----------|:------------------------|
 | `bed`          | Bed topography        | yes       | `BedMachineV3()`        |
-| `geometry`     | Geometry / Tma        | yes       | `ALBMAPv1()`            |
+| `surface_temp` | Surface temperature   | yes       | `ALBMAPv1()`            |
 | `temperature`  | 3-D temperature       | yes       | `FrankTemps()`          |
 | `velocity`     | Ice velocity          | no        | `MEaSUREs()`            |
 | `accumulation` | Snow accumulation     | no        | `ArthernAccumulation()` |
@@ -49,7 +49,7 @@ Use `NoData()` for optional categories you want to skip.
 Base.@kwdef struct ConstructorParams
     # ── Data sources (SourceConfig per category) ─────────────────────
     bed::SourceConfig{<:Union{BedSource,NoData}}              = SourceConfig(BedMachineV3())
-    geometry::SourceConfig{<:Union{SurfaceTempSource,NoData}}    = SourceConfig(ALBMAPv1())
+    surface_temp::SourceConfig{<:Union{SurfaceTempSource,NoData}}    = SourceConfig(ALBMAPv1())
     temperature::SourceConfig{<:Union{TemperatureSource,NoData}} = SourceConfig(FrankTemps())
     velocity::SourceConfig{<:Union{VelocitySource,NoData}}    = SourceConfig(MEaSUREs())
     accumulation::SourceConfig{<:Union{AccumulationSource,NoData}} = SourceConfig(ArthernAccumulation())
@@ -96,8 +96,8 @@ function to_dict(params::ConstructorParams)
         # Data sources (source singleton + path)
         :bed_source          => params.bed.source,
         :bed_file            => params.bed.path,
-        :geometry_source     => params.geometry.source,
-        :geometry_file       => params.geometry.path,
+        :surface_temp_source  => params.surface_temp.source,
+        :surface_temp_file    => params.surface_temp.path,
         :temperature_source  => params.temperature.source,
         :temperature_file    => params.temperature.path,
         :velocity_source     => params.velocity.source,
@@ -124,7 +124,7 @@ end
 # ── Auto-wrapping helper ─────────────────────────────────────────────
 
 # Source-config fields on ConstructorParams that accept auto-wrapping.
-const _SOURCE_FIELDS = (:bed, :geometry, :temperature, :velocity, :accumulation, :dhdt, :basins)
+const _SOURCE_FIELDS = (:bed, :surface_temp, :temperature, :velocity, :accumulation, :dhdt, :basins)
 
 """
     _as_source_config(x)

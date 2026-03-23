@@ -17,7 +17,7 @@ export load_data, interpolate_to_grid, interpolate_temperature, geotiff_read_axi
 Load and process the ALBMAP NetCDF file.
 
 # Returns
-A `NamedTuple` with grid, geometry, and temperature fields:
+A `NamedTuple` with grid, surface, and temperature fields:
   `(dx, dy, nx, ny, x0, y0, xx, yy, h, s, b, firn, Tma, a_Arthern, a_vdBerg, surfType)`
 """
 function load_data(::ALBMAPv1, filename::String)

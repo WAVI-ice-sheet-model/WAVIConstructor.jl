@@ -200,7 +200,7 @@ end
 """
     load_additional_datasets(Gh, params)
 
-Load accumulation, basin, and geometry data via dispatch on source types.
+Load accumulation, basin, and surface temperature data via dispatch on source types.
 """
 function load_additional_datasets(Gh, params)
     # ── Accumulation ──────────────────────────────────────────────────
@@ -227,12 +227,12 @@ function load_additional_datasets(Gh, params)
         Gh = merge(Gh, (basin_id = zeros(size(Gh.xx)),))
     end
 
-    # ── Geometry / mean-annual temperature (ALBMAP) ───────────────────
-    geom_source = get(params, :geometry_source, ALBMAPv1())
-    geom_file   = get(params, :geometry_file, default_path(ALBMAPv1()))
+    # ── Surface temperature / mean-annual temperature (ALBMAP) ────────
+    geom_source = get(params, :surface_temp_source, ALBMAPv1())
+    geom_file   = get(params, :surface_temp_file, default_path(ALBMAPv1()))
 
     if geom_source isa NoData
-        error("Geometry source (e.g. ALBMAP) is required and cannot be NoData.")
+        error("Surface temperature source (e.g. ALBMAP) is required and cannot be NoData.")
     end
 
     geom_data = load_data(geom_source, geom_file)

@@ -40,7 +40,7 @@ using WAVIConstructor
 # Create parameters — each dataset is just a source singleton (default paths built-in)
 params = default_constructor_params(
     bed          = BedMachineV3(),
-    geometry     = ALBMAPv1(),
+    surface_temp = ALBMAPv1(),
     temperature  = BISICLESTemps(),
     velocity     = MEaSUREs(),
     accumulation = ArthernAccumulation(),
@@ -134,7 +134,7 @@ Each data category is specified as a `SourceConfig{S}` pairing a source type wit
 | Field          | Category              | Required? | Default source          |
 |:---------------|:----------------------|:----------|:------------------------|
 | `bed`          | Bed topography        | yes       | `BedMachineV3()`        |
-| `geometry`     | Geometry / Tma        | yes       | `ALBMAPv1()`            |
+| `surface_temp` | Surface temperature   | yes       | `ALBMAPv1()`            |
 | `temperature`  | 3-D temperature       | yes       | `FrankTemps()`          |
 | `velocity`     | Ice velocity          | no        | `MEaSUREs()`            |
 | `accumulation` | Snow accumulation     | no        | `ArthernAccumulation()` |
