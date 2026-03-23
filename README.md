@@ -30,28 +30,58 @@ The main workflow involves three steps:
 
 The `init_bedmachine` and `select_domain_wavi` functions are wrapped within `setup_wavi_data`.
 
-All configurations (data sources, domains, grid spacing, file output) are defined in the constructor params.
+All configurations (data sources, domains, grid spacing, file output) are defined via the `ConstructorParams` struct. Each geophysical dataset is specified by a **source type** singleton (e.g. `BedMachineV3()`), optionally paired with a custom file path as a tuple. Use `NoData()` for optional categories you want to skip.
 
 ### Simple Workflow
 
 ```julia
 using WAVIConstructor
 
-# Define all data construction parameters
+# Create parameters — each dataset is just a source singleton (default paths built-in)
 params = default_constructor_params(
-    bedmachine_file = "/path/to/data/BedMachineAntarctica-v3.nc",
-    albmap_file = "/path/to/data/ALBMAPv1.nc",
-    zwally_file = "/path/to/data/ZwallyBasins.mat",
-    smith_dhdt_dir = "/path/to/data/Smith_2020_dhdt",  # Optional: directory with Smith dhdt data
-    measures_velocity_file = "/path/to/data/antarctica_ice_velocity_2016_2017_1km_v01.nc",  # Optional: MEaSUREs velocity
-    bisicles_temps_file = "/path/to/data/antarctica-bisicles-xyzT-8km.nc",  # Optional: BISICLES temperature
-    dx = 10000.0,  # Grid spacing in metres
-    basins = [1, 2, 3],  # Zwally drainage basins to include
-    output_path = "wavi_inversion_input"
+    bed          = BedMachineV3(),
+    geometry     = ALBMAPv1(),
+    temperature  = BISICLESTemps(),
+    velocity     = MEaSUREs(),
+    accumulation = ArthernAccumulation(),
+    dhdt         = SmithDhdt(),
+    basins       = ZwallyBasins(),
+    dx           = 10000.0,          # Grid spacing in metres
+    basin_ids    = [1, 2, 3],        # Zwally drainage basins to include
+    output_path  = "wavi_inversion_input",
 )
 
 # Complete workflow: initialise, select domain, and write WAVI input files
 Gh, Gu, Gv, Gc = setup_wavi_data(params)
+```
+
+Since all source singletons carry a built-in default path, the above is equivalent to just overriding what you need:
+
+```julia
+params = default_constructor_params(
+    temperature = BISICLESTemps(),   # uses default path
+    basin_ids   = [4],
+)
+```
+
+To supply a custom file path, pass a `(source, path)` tuple:
+
+```julia
+params = default_constructor_params(
+    temperature = (BISICLESTemps(), "my/custom/temps.nc"),
+    basin_ids   = [4],
+)
+```
+
+### Skipping optional datasets
+
+Use `NoData()` for categories you don't need. Velocity and dh/dt default to zeros when skipped:
+
+```julia
+params = default_constructor_params(
+    velocity = NoData(),   # skip velocity — zeros used
+    dhdt     = NoData(),   # skip dh/dt   — zeros used
+)
 ```
 
 ### Running step-by-step
@@ -59,26 +89,27 @@ Gh, Gu, Gv, Gc = setup_wavi_data(params)
 You can also run the workflow step-by-step for more control and intermediate inspection:
 
 ```julia
-# Step 1: Initialise grids
-Gh, Gu, Gv, Gc = init_bedmachine(params)
-
-# Step 2: Select domain
-Gh, Gu, Gv, Gc = select_domain_wavi(Gh, Gu, Gv, Gc, params)
-
-# Step 3: Process and write files
-Gh, Gu, Gv, Gc = setup_wavi_data(params)
+d = to_dict(params)                           # convert to Dict for the internal API
+Gh, Gu, Gv, Gc = init_bedmachine(d)          # Step 1: load & interpolate data
+Gh, Gu, Gv, Gc = select_domain_wavi(Gh, Gu, Gv, Gc, d)  # Step 2: mask domain
 ```
 
-### Loading data only
-You can also use the low-level data loading functions directly to inspect specific datasets:
+### Loading individual datasets
+
+Use the dispatch-based `load_data` interface to inspect a single dataset:
 
 ```julia
-using WAVIConstructor.DataLoading
+using WAVIConstructor
 
-# Load specific datasets (all file paths should be full paths)
-bed, x, y, geoid, mask, thickness, surface, firn = get_bedmachine("/path/to/data/BedMachineAntarctica-v3.nc")
-xx, yy, vx, vy = get_measures_velocities("/path/to/data/velocity_file.nc")
+# Each source singleton selects the right loader
+bm = load_data(BedMachineV3(), "Data/BedMachineAntarctica-v3.nc")
+bm.bed   # bed topography array
+bm.x     # x coordinates
+
+vel = load_data(MEaSUREs(), "Data/Antarctica_ice_velocity_2014_2015_1km_v01.nc")
+vel.vx   # x-velocity component
 ```
+
 ## Outputs
 
 After running `setup_wavi_data()`, you'll have binary `.bin` files in your output directory containing:
@@ -94,32 +125,46 @@ After running `setup_wavi_data()`, you'll have binary `.bin` files in your outpu
 
 These files are in the format expected by WAVI.jl.
 
-## Configuration Parameters
+## Data Source Configuration
 
-Key parameters you can set:
+Each data category is specified as a `SourceConfig{S}` pairing a source type with a file path.
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `bedmachine_file` | Full path to BedMachine NetCDF file | `"Data/BedMachineAntarctica-v3.nc"` |
-| `albmap_file` | Full path to ALBMAP file | `"Data/ALBMAPv1.nc"` |
-| `zwally_file` | Full path to Zwally basins file | `"Data/ZwallyBasins.mat"` |
-| `arthern_file` | Full path to Arthern accumulation file | `"Data/amsr_accumulation_map.txt"` |
-| `smith_dhdt_dir` | Full path to directory containing Smith dh/dt files (optional) | `"Data/Smith_2020_dhdt"` |
-| `frank_temps_file` | Full path to Frank temperatures file (optional, alternative to bisicles_temps_file) | `"Data/FranksTemps.mat"` |
-| `measures_velocity_file` | Full path to MEaSUREs velocity NetCDF file (optional) | `"Data/antarctica_ice_velocity_2016_2017_1km_v01.nc"` |
-| `bisicles_temps_file` | Full path to BISICLES temperature file (optional, alternative to frank_temps_file) | `"Data/antarctica-bisicles-xyzT-8km.nc"` |
-| `dx` | Grid spacing (m) | `10000.0` |
-| `basins` | Zwally basin IDs to include | `1:27` (all) |
-| `output_path` | Directory for output files | `"wavi_input"` |
-| `clip_edge_padding` | Edge padding when clipping | `3` |
-| `density_ice` | Ice density (kg/m³) | `918.0` |
-| `density_ocean` | Ocean density (kg/m³) | `1028.0` |
-| `min_thick` | Minimum ice thickness (m) | `50.0` |
+### Data source fields on `ConstructorParams`
 
-### Dataset options:
-- Temperature data: Choose between `frank_temps_file` (Frank's temperature data) or `bisicles_temps_file` (BISICLES temperature data). Temperature data is required - you must provide one of these.
-- Velocity data: Provide `measures_velocity_file` (MEaSUREs NetCDF format). If not provided, zero velocities will be used.
-- Elevation change data: Provide `smith_dhdt_dir` to use Smith et al. 2020 elevation change data. If not provided, zeros will be used.
+| Field          | Category              | Required? | Default source          |
+|:---------------|:----------------------|:----------|:------------------------|
+| `bed`          | Bed topography        | yes       | `BedMachineV3()`        |
+| `geometry`     | Geometry / Tma        | yes       | `ALBMAPv1()`            |
+| `temperature`  | 3-D temperature       | yes       | `FrankTemps()`          |
+| `velocity`     | Ice velocity          | no        | `MEaSUREs()`            |
+| `accumulation` | Snow accumulation     | no        | `ArthernAccumulation()` |
+| `dhdt`         | Elevation change rate | no        | `SmithDhdt()`           |
+| `basins`       | Drainage basins       | no        | `ZwallyBasins()`        |
+
+### Scalar / processing parameters
+
+| Parameter          | Description                      | Default    |
+|:-------------------|:---------------------------------|:-----------|
+| `dx`               | Grid spacing (m)                 | `10000.0`  |
+| `basin_ids`        | Zwally basin IDs to include      | `1:27`     |
+| `output_path`      | Directory for output files       | `"wavi_input"` |
+| `clip_edge_padding`| Edge padding when clipping       | `3`        |
+| `density_ice`      | Ice density (kg/m³)              | `918.0`    |
+| `density_ocean`    | Ocean density (kg/m³)            | `1028.0`   |
+| `min_thick`        | Minimum ice thickness (m)        | `50.0`     |
+| `sub_samp`         | Velocity subsampling factor      | `8`        |
+
+### Adding a new data source
+
+The dispatch architecture makes it easy to add new datasets:
+
+1. Define a singleton: `struct MyNewSource <: TemperatureSource end`
+2. Set its default path: `default_path(::MyNewSource) = "Data/my_file.nc"`
+3. Implement `load_data(::MyNewSource, file)` returning the category's standard NamedTuple
+4. Implement `interpolate_temperature(::MyNewSource, data, Gh)` (temperature sources only)
+
+No `if/else` changes anywhere — the dispatch system routes automatically.
+Users can then write `temperature = MyNewSource()` and the auto-wrapping handles the rest.
 
 ## Obtaining Data
 TBC

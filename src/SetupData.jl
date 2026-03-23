@@ -8,6 +8,7 @@ using Interpolations
 using WAVIConstructor.InitBedMachine: init_bedmachine
 using WAVIConstructor.DomainSelection: select_domain_wavi
 using WAVIConstructor.ParamHelpers: ConstructorParams, to_dict
+using WAVIConstructor.DataSources: BedMachineV3, NoData
 
 export setup_wavi_data
 
@@ -44,12 +45,11 @@ function setup_wavi_data(params; output_path="outputs", edge=3)
     end
     
     # Initialise grids using relevant datasets
-    start_data = get(params, :start_data, "BEDMACHINEV3")
-    if uppercase(start_data) == "BEDMACHINEV3"
-        Gh, Gu, Gv, Gc = init_bedmachine(params)
-    else
-        error("Starting Dataset is not defined")
+    bed_source = get(params, :bed_source, BedMachineV3())
+    if bed_source isa NoData
+        error("Bed topography source is required and cannot be NoData.")
     end
+    Gh, Gu, Gv, Gc = init_bedmachine(params)
     
     # Select domain using params.basins
     Gh, Gu, Gv, Gc = select_domain_wavi(Gh, Gu, Gv, Gc, params)

@@ -6,32 +6,21 @@ using MAT
 using NearestNeighbors
 import DelimitedFiles: readdlm
 
-export get_albmap, get_bedmachine, get_bisicles_temps, get_measures_velocities, geotiff_read_axis_only, get_smith_dhdt, get_arthern_accumulation, get_zwally_basins, get_frank_temps
+using WAVIConstructor.DataSources
+
+export load_data, interpolate_to_grid, interpolate_temperature, geotiff_read_axis_only
 
 
 """
-    get_albmap(filename::String)
+    load_data(::ALBMAPv1, filename::String)
 
-Load and process the ALBMAP NetCDF file, returning a dictionary of derived fields.
-
-# Arguments
-- `filename::String`: Path to the ALBMAP NetCDF file.
+Load and process the ALBMAP NetCDF file.
 
 # Returns
-- `Dict`: Dictionary with grid, geometry, and accumulation fields.
-    - `:dx`, `:dy`: Grid spacing (x, y)
-    - `:nx`, `:ny`: Number of grid points (x, y)
-    - `:x0`, `:y0`: Grid origin (x, y)
-    - `:xx`, `:yy`: 2D coordinate grids
-    - `:h`: Ice thickness
-    - `:s`: Surface elevation above firn
-    - `:b`: Bed elevation
-    - `:firn`: Firn thickness
-    - `:Tma`: Mean annual temperature (K)
-    - `:a_Arthern`, `:a_vdBerg`: Accumulation fields
-    - `:surfType`: Surface type mask
+A `NamedTuple` with grid, geometry, and temperature fields:
+  `(dx, dy, nx, ny, x0, y0, xx, yy, h, s, b, firn, Tma, a_Arthern, a_vdBerg, surfType)`
 """
-function get_albmap(filename::String)
+function load_data(::ALBMAPv1, filename::String)
     data = Dict()
     ds = NCDataset(filename)
     for var in keys(ds)
@@ -56,47 +45,36 @@ function get_albmap(filename::String)
     a_vdBerg = permutedims(data["accr"])
     surfType = permutedims(data["mask_plus"])
 
-    return Dict(
-        :dx => dx,
-        :dy => dy,
-        :nx => nx,
-        :ny => ny,
-        :x0 => x0,
-        :y0 => y0,
-        :xx => xx,
-        :yy => yy,
-        :h => h,
-        :s => s,
-        :b => b,
-        :firn => firn_out,
-        :Tma => Tma,
-        :a_Arthern => a_Arthern,
-        :a_vdBerg => a_vdBerg,
-        :surfType => surfType
+    return (
+        dx = dx,
+        dy = dy,
+        nx = nx,
+        ny = ny,
+        x0 = x0,
+        y0 = y0,
+        xx = xx,
+        yy = yy,
+        h = h,
+        s = s,
+        b = b,
+        firn = firn_out,
+        Tma = Tma,
+        a_Arthern = a_Arthern,
+        a_vdBerg = a_vdBerg,
+        surfType = surfType,
     )
 end
 
 
 """
-    get_bedmachine(filename::String)
+    load_data(::BedMachineV3, filename::String)
 
-Load BedMachine NetCDF variables and return them.
-
-# Arguments
-- `filename::String`: Path to the BedMachine NetCDF file.
+Load BedMachine v3 NetCDF variables.
 
 # Returns
-- Tuple: (bed, x, y, geoid, mask, thickness, surface, firn)
-    - `bed`: Bed elevation
-    - `x`: x-coordinates
-    - `y`: y-coordinates
-    - `geoid`: Geoid height
-    - `mask`: Mask array
-    - `thickness`: Ice thickness
-    - `surface`: Surface elevation
-    - `firn`: Firn thickness
+A `NamedTuple`: `(bed, x, y, geoid, mask, thickness, surface)`
 """
-function get_bedmachine(filename::String)
+function load_data(::BedMachineV3, filename::String)
     ds = NCDataset(filename)
     try
         bed = Array(ds["bed"])
@@ -106,8 +84,8 @@ function get_bedmachine(filename::String)
         mask = Array(ds["mask"])
         surface = Array(ds["surface"])
         thickness = Array(ds["thickness"])
-        firn = Array(ds["firn"])
-        return bed, x, y, geoid, mask, thickness, surface, firn
+        return (bed = bed, x = x, y = y, geoid = geoid, mask = mask,
+                thickness = thickness, surface = surface)
     finally
         close(ds)
     end
@@ -115,65 +93,36 @@ end
 
 
 """
-    get_bisicles_temps(fname_start::String; scale_xy::Real=1)
+    load_data(::BISICLESTemps, filename::String; scale_xy::Real=1)
 
 Load temperature and coordinate data from a BISICLES NetCDF file.
 
-# Arguments
-- `fname_start::String`: Path to the NetCDF file containing BISICLES temperature data
-- `scale_xy::Real=1`: Scaling factor to apply to x and y coordinates (e.g., 1000 to convert km to m)
-
 # Returns
-A tuple containing:
-- `bisicles_sigma`: Sigma coordinate values
-- `bisicles_x`: X coordinate values (scaled by `scale_xy`)
-- `bisicles_y`: Y coordinate values (scaled by `scale_xy`)
-- `bisicles_z`: Z coordinate values
-- `bisicles_temps`: Temperature data
-
-# Example
-```julia
-sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc")
-sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", scale_xy=1000)  # Convert km to m
-sigma, x, y, z, temps = get_bisicles_temps("antarctica-bisicles-xyzT-8km.nc", scale_xy=0.001)  # Convert m to km
-```
+A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::FrankTemps, …)`.
 """
-function get_bisicles_temps(fname_start::String; scale_xy::Real=1)
-    ds = NCDataset(fname_start)
+function load_data(::BISICLESTemps, filename::String; scale_xy::Real=1)
+    ds = NCDataset(filename)
     try
         bisicles_sigma = vec(Array(ds["sigma"]))
         bisicles_temps = Array(ds["T"])
         bisicles_x = vec(scale_xy .* Array(ds["x"]))
         bisicles_y = vec(scale_xy .* Array(ds["y"]))  
-        bisicles_z = Array(ds["z"])
 
-        return bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps
+        return (temps = bisicles_temps, xx = bisicles_x, yy = bisicles_y, sigma = bisicles_sigma)
     finally
         close(ds)
     end
 end
 
 """
-    get_measures_velocities(filename::String)
+    load_data(::MEaSUREs, filename::String)
 
-Load velocity data from a NetCDF file.
-
-# Arguments
-- `filename::String`: Path to the NetCDF file containing velocity data
+Load ice-velocity data from a MEaSUREs NetCDF file.
 
 # Returns
-A tuple containing:
-- `xx_v`: 2D grid of x coordinates
-- `yy_v`: 2D grid of y coordinates  
-- `VX`: X-component velocity data
-- `VY`: Y-component velocity data
-
-# Example
-```julia
-xx, yy, vx, vy = get_measures_velocities("Antarctic_ice_velocity_2016_2017_1km_v01.nc")
-```
+A `NamedTuple`: `(xx, yy, vx, vy)`
 """
-function get_measures_velocities(filename::String)
+function load_data(::MEaSUREs, filename::String)
     ds = NCDataset(filename)
     try
         Measures_x = Array(ds["x"])
@@ -185,7 +134,7 @@ function get_measures_velocities(filename::String)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
         yy_v = repeat(Measures_y', length(Measures_x), 1)
 
-        return xx_v, yy_v, VX, VY
+        return (xx = xx_v, yy = yy_v, vx = VX, vy = VY)
     finally
         close(ds)
     end
@@ -300,35 +249,15 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
 end
 
 """
-    get_smith_dhdt(; grnd_file=nothing, flt_file=nothing, smith_dir="Data/Smith_2020_dhdt")
+    load_data(::SmithDhdt, smith_dir::String; grnd_file=nothing, flt_file=nothing)
 
-Load dhdt (elevation/thickness change) data from Smith et al. 2020 GeoTIFF file(s).
-
-# Arguments
-- `grnd_file::Union{String,Nothing}`: Path to grounded ice GeoTIFF file (optional)
-- `flt_file::Union{String,Nothing}`: Path to floating ice GeoTIFF file (optional)
-- `smith_dir::String`: Directory containing default files if grnd_file/flt_file not specified
+Load dh/dt (elevation/thickness change) data from Smith et al. 2020 GeoTIFF files.
 
 # Returns
-If both grnd_file and flt_file are provided (or found in smith_dir):
-- NamedTuple with (grnd_xx, grnd_yy, grnd_dhdt, flt_xx, flt_yy, flt_dhdt)
-
-If only one file is provided:
-- Tuple (xx, yy, dhdt)
-
-# Examples
-```julia
-# Load single file
-xx, yy, dhdt = get_smith_dhdt(grnd_file="ais_grounded.tif")
-
-# Load both files from directory
-data = get_smith_dhdt(smith_dir="Data/Smith_2020_dhdt")
-
-# Load both files explicitly
-data = get_smith_dhdt(grnd_file="ais_grounded.tif", flt_file="ais_floating.tif")
-```
+A `NamedTuple`: `(grnd_xx, grnd_yy, grnd_dhdt, flt_xx, flt_yy, flt_dhdt)`,
+or `nothing` if the files cannot be found.
 """
-function get_smith_dhdt(; grnd_file=nothing, flt_file=nothing, smith_dir="Data/Smith_2020_dhdt")
+function load_data(::SmithDhdt, smith_dir::String; grnd_file=nothing, flt_file=nothing)
     # Helper function to load a single file
     function load_single_file(filename)
         dhdt_raw = ArchGDAL.read(filename) do dataset
@@ -385,55 +314,37 @@ function get_smith_dhdt(; grnd_file=nothing, flt_file=nothing, smith_dir="Data/S
             flt_dhdt = flt_dhdt
         )
     elseif grnd_file !== nothing
-        # Load only grounded file
+        # Load only grounded file — store in grnd fields, zeros for flt
         if !isfile(grnd_file)
             return nothing
         end
-        return load_single_file(grnd_file)
+        gxx, gyy, gdhdt = load_single_file(grnd_file)
+        return (
+            grnd_xx = gxx, grnd_yy = gyy, grnd_dhdt = gdhdt,
+            flt_xx = gxx, flt_yy = gyy, flt_dhdt = zeros(size(gdhdt)),
+        )
     elseif flt_file !== nothing
-        # Load only floating file
+        # Load only floating file — store in flt fields, zeros for grnd
         if !isfile(flt_file)
             return nothing
         end
-        return load_single_file(flt_file)
+        fxx, fyy, fdhdt = load_single_file(flt_file)
+        return (
+            grnd_xx = fxx, grnd_yy = fyy, grnd_dhdt = zeros(size(fdhdt)),
+            flt_xx = fxx, flt_yy = fyy, flt_dhdt = fdhdt,
+        )
     end
 end
 
 """
-    get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+    load_data(::ArthernAccumulation, filename::String)
 
 Load Arthern accumulation data from a text file.
 
-Data source: Arthern, R. J., D. P. Winebrenner, and D. G. Vaughan (2006), 
-"Antarctic snow accumulation mapped using polarization of 4.3-cm wavelength microwave emission",
-J. Geophys. Res., 111, D06107, doi:10.1029/2004JD005667
-
-# Arguments
-- `filename::String`: Path to the Arthern accumulation text file (default: "Data/amsr_accumulation_map.txt")
-
 # Returns
-A tuple containing:
-- `aa_lat`: Latitude values (degrees)
-- `aa_lon`: Longitude values (degrees, 0-360 convention)
-- `aa_x`: X-coordinate values in Polar Stereographic projection (meters)
-- `aa_y`: Y-coordinate values in Polar Stereographic projection (meters)
-- `aa_acc`: Accumulation values (converted to ice equivalent, divided by 917 kg/m³)
-- `aa_err`: Estimated RMS error at 100 km scale (% of accumulation)
-
-# Coordinate System
-- Polar Stereographic projection
-- Latitude of true scale: 71°S
-- Ellipsoid: WGS84
-- Effective resolution: ~100 km
-
-# Notes
-- The file should have 21 header lines containing metadata
-- Data is space-delimited with 6 columns: lat, lon, x, y, accumulation, error
-- Accumulation values are converted from water equivalent (kg/m²/a) to ice equivalent (m/a)
-- Rows with NaN accumulation values are filtered out
-- Warning: values for locations subject to melt may be unreliable
+A `NamedTuple`: `(x, y, acc)` — only the fields used downstream.
 """
-function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.txt")
+function load_data(::ArthernAccumulation, filename::String)
     # Read the file content, handling potential Windows line endings
     content = read(filename, String)
     content = replace(content, "\r\n" => "\n")  # Convert Windows to Unix line endings
@@ -485,28 +396,18 @@ function get_arthern_accumulation(filename::String="Data/amsr_accumulation_map.t
     # Convert accumulation from water equivalent to ice equivalent (divide by 917 kg/m³)
     aa_acc = aa_acc_raw[valid_mask] ./ 917.0
 
-    return aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err
+    return (x = aa_x, y = aa_y, acc = aa_acc)
 end
 
 """
-    get_zwally_basins(filename::String="Data/ZwallyBasins.mat")
+    load_data(::ZwallyBasins, filename::String)
 
 Load Zwally drainage basins from a MATLAB .mat file.
 
-# Arguments
-- `filename::String`: Path to the Zwally basins .mat file (default: "Data/ZwallyBasins.mat")
-
 # Returns
-A tuple containing:
-- `xx_zwally`: X-coordinate values (filtered to only include points where ZwallyBasins > 0)
-- `yy_zwally`: Y-coordinate values (filtered to only include points where ZwallyBasins > 0)
-- `zwally_basins`: Basin ID values (filtered to only include points where ZwallyBasins > 0)
-
-# Notes
-- The .mat file should contain variables: `xxZwallyBasins`, `yyZwallyBasins`, `ZwallyBasins`
-- Only points where `ZwallyBasins > 0` are returned
+A `NamedTuple`: `(xx, yy, basins)` — filtered to points where basins > 0.
 """
-function get_zwally_basins(filename::String="Data/ZwallyBasins.mat")
+function load_data(::ZwallyBasins, filename::String)
     matopen(filename) do mat_file
         xx_zwally_full = read(mat_file, "xxZwallyBasins")
         yy_zwally_full = read(mat_file, "yyZwallyBasins")
@@ -520,30 +421,19 @@ function get_zwally_basins(filename::String="Data/ZwallyBasins.mat")
         yy_zwally = yy_zwally_full[valid_mask]
         zwally_basins = zwally_basins_full[valid_mask]
 
-        return xx_zwally, yy_zwally, zwally_basins
+        return (xx = xx_zwally, yy = yy_zwally, basins = zwally_basins)
     end
 end
 
 """
-    get_frank_temps(filename::String="Data/FranksTemps.mat")
+    load_data(::FrankTemps, filename::String)
 
 Load Frank temperature data from a MATLAB .mat file.
 
-# Arguments
-- `filename::String`: Path to the FranksTemps .mat file (default: "Data/FranksTemps.mat")
-
 # Returns
-A NamedTuple containing:
-- `FranksTemps`: 3D temperature data array (levels × points)
-- `xxTemp`: X-coordinate values
-- `yyTemp`: Y-coordinate values
-- `sigmaTemp`: Sigma coordinate values (vertical levels)
-
-# Notes
-- The .mat file should contain variables: `FranksTemps`, `xxTemp`, `yyTemp`, `sigmaTemp`
-- FranksTemps is a 2D array where rows represent vertical levels and columns represent spatial points
+A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::BISICLESTemps, …)`.
 """
-function get_frank_temps(filename::String="Data/FranksTemps.mat")
+function load_data(::FrankTemps, filename::String)
     matopen(filename) do mat_file
         FranksTemps = read(mat_file, "FranksTemps")
         xxTemp = read(mat_file, "xxTemp")
@@ -551,10 +441,10 @@ function get_frank_temps(filename::String="Data/FranksTemps.mat")
         sigmaTemp = read(mat_file, "sigmaTemp")
 
         return (
-            FranksTemps = FranksTemps,
-            xxTemp = xxTemp,
-            yyTemp = yyTemp,
-            sigmaTemp = vec(sigmaTemp)
+            temps = FranksTemps,
+            xx = xxTemp,
+            yy = yyTemp,
+            sigma = vec(sigmaTemp),
         )
     end
 end
@@ -591,5 +481,81 @@ function interpolate_to_grid(x, y, values, xi, yi)
     # Reshape to match target grid
     return reshape(result_flat, size(xi))
 end
+
+# ── Temperature interpolation (dispatch per source) ──────────────────
+
+"""
+    interpolate_temperature(source::TemperatureSource, temp_data, Gh)
+
+Interpolate raw temperature data onto the H-grid.  Each concrete
+`TemperatureSource` subtype implements its own method so that
+source-specific pre-processing (masking, grid construction, etc.)
+is handled through dispatch rather than if/else chains.
+
+# Returns
+`(temperature, sigmas)` where `temperature` is `(nσ, nx, ny)` and
+`sigmas` is a 1-D vector of sigma levels.
+"""
+function interpolate_temperature end   # forward declaration for docstring
+
+"""
+    interpolate_temperature(::FrankTemps, temp_data, Gh)
+
+FranksTemps stores `(sigma_levels, ny, nx)`.  `xx` / `yy` are 1-D
+vectors that can be passed straight to `interpolate_to_grid`.
+"""
+function interpolate_temperature(::FrankTemps, temp_data, Gh)
+    temps_raw = temp_data.temps
+    sigmas    = temp_data.sigma
+
+    temperature = zeros(size(temps_raw, 1), Gh.nx, Gh.ny)
+    for i in 1:size(temps_raw, 1)
+        temperature[i, :, :] = interpolate_to_grid(
+            temp_data.xx[:], temp_data.yy[:], temps_raw[i, :, :][:],
+            Gh.xx, Gh.yy
+        )
+    end
+    return temperature, sigmas
+end
+
+"""
+    interpolate_temperature(::BISICLESTemps, temp_data, Gh)
+
+BISICLES stores `(sigma_levels, ny, nx)` with 1-D coordinate vectors.
+Values above 273.148 K are treated as invalid ocean fill and masked
+before interpolation.
+"""
+function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
+    temps_raw = copy(temp_data.temps)       # copy so we can NaN-mask in place
+    sigmas    = temp_data.sigma
+
+    bisicles_yy = repeat(temp_data.yy, 1, length(temp_data.xx))
+    bisicles_xx = repeat(temp_data.xx', length(temp_data.yy), 1)
+
+    temperature = zeros(length(sigmas), Gh.nx, Gh.ny)
+
+    for i in 1:length(sigmas)
+        ocean_mask = temps_raw[i, :, :] .> 273.1480
+        temps_raw[i, ocean_mask] .= NaN
+
+        this_temp  = temps_raw[i, :, :]
+        valid_mask = .!isnan.(this_temp)
+        xx_valid   = bisicles_xx[valid_mask]
+        yy_valid   = bisicles_yy[valid_mask]
+        temp_valid = this_temp[valid_mask]
+
+        temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
+    end
+    return temperature, sigmas
+end
+
+# ── NoData fallback methods ───────────────────────────────────────────
+
+"""
+    load_data(::NoData, ::String; kwargs...)
+
+Generic no-op: returns `nothing` when a category is disabled.
+"""
+load_data(::NoData, ::String; kwargs...) = nothing
 
 end # module
