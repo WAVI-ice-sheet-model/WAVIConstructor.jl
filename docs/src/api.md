@@ -1,6 +1,6 @@
 # API Reference
 
-This page documents the main exported functions and types in WAVIConstructor.jl. The package provides a three-step workflow for preparing WAVI input data: initialize grids, select domain, and write output files.
+This page documents the main exported functions and types in WAVIConstructor.jl. Each dataset has its own label type (e.g. `BedMachineV3`, `BISICLESTemps`), and passing that label to `load_data` which calls the right loading code for it.
 
 ## Main Workflow Functions
 
@@ -14,7 +14,7 @@ WAVIConstructor.setup_wavi_data
 
 ## Parameter Helpers
 
-Functions and types for creating and managing parameter dictionaries for WAVI data construction.
+Functions and types for creating and managing the `ConstructorParams` configuration struct.
 
 ```@docs
 WAVIConstructor.ConstructorParams
@@ -23,19 +23,61 @@ WAVIConstructor.minimal_constructor_params
 WAVIConstructor.to_dict
 ```
 
-## Data Loading Functions
+## Data Source Types
 
-Functions for loading various geophysical datasets used in WAVI simulations. These are exported from the `DataLoading` submodule and can be accessed directly or via `WAVIConstructor.DataLoading`.
+The type hierarchy used for dispatch-based data source selection.
 
 ```@docs
-WAVIConstructor.DataLoading.get_albmap
-WAVIConstructor.DataLoading.get_bedmachine
-WAVIConstructor.DataLoading.get_bisicles_temps
-WAVIConstructor.DataLoading.get_measures_velocities
-WAVIConstructor.DataLoading.get_smith_dhdt
-WAVIConstructor.DataLoading.get_arthern_accumulation
-WAVIConstructor.DataLoading.get_zwally_basins
-WAVIConstructor.DataLoading.get_frank_temps
+WAVIConstructor.DataSources.DataSource
+WAVIConstructor.DataSources.SourceConfig
+WAVIConstructor.DataSources.NoData
+WAVIConstructor.DataSources.default_path
+```
+
+### Category abstract types
+
+Each data category has its own abstract subtype of `DataSource`:
+
+- `BedSource` — bed topography (e.g. `BedMachineV3`)
+- `SurfaceTempSource` — mean annual surface temperature (e.g. `ALBMAPv1`)
+- `TemperatureSource` — 3-D temperature fields (e.g. `FrankTemps`, `BISICLESTemps`)
+- `VelocitySource` — ice velocity (e.g. `MEaSUREs`)
+- `AccumulationSource` — snow accumulation (e.g. `ArthernAccumulation`)
+- `DhDtSource` — elevation-change rates (e.g. `SmithDhdt`)
+- `BasinSource` — drainage basin delineations (e.g. `ZwallyBasins`)
+
+```@docs
+WAVIConstructor.DataSources.BedSource
+WAVIConstructor.DataSources.SurfaceTempSource
+WAVIConstructor.DataSources.TemperatureSource
+WAVIConstructor.DataSources.VelocitySource
+WAVIConstructor.DataSources.AccumulationSource
+WAVIConstructor.DataSources.DhDtSource
+WAVIConstructor.DataSources.BasinSource
+```
+
+### Concrete source singletons
+
+```@docs
+WAVIConstructor.DataSources.BedMachineV3
+WAVIConstructor.DataSources.ALBMAPv1
+WAVIConstructor.DataSources.FrankTemps
+WAVIConstructor.DataSources.BISICLESTemps
+WAVIConstructor.DataSources.MEaSUREs
+WAVIConstructor.DataSources.ArthernAccumulation
+WAVIConstructor.DataSources.SmithDhdt
+WAVIConstructor.DataSources.ZwallyBasins
+```
+
+## Data Loading Functions
+
+All dataset loading goes through the dispatch-based `load_data` interface.
+Each source singleton selects the appropriate method.
+
+```@docs
+WAVIConstructor.DataLoading.load_data
+WAVIConstructor.DataLoading.interpolate_to_grid
+WAVIConstructor.DataLoading.interpolate_temperature
 WAVIConstructor.DataLoading.geotiff_read_axis_only
 ```
 

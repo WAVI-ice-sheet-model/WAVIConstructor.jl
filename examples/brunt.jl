@@ -9,57 +9,52 @@
 
 using WAVIConstructor
 
-# Get the package root directory (parent of examples/)
-const PACKAGE_ROOT = dirname(@__DIR__)
-const DATA_DIR = joinpath(PACKAGE_ROOT, "Data")
-const OUTPUT_DIR = joinpath(PACKAGE_ROOT, "outputs", "basin4_brunt_shelf")
-
 # Parameter Configuration
 
 params = default_constructor_params(
     # BedMachine v3: bed topography, ice thickness, surface elevation
-    bedmachine_file = joinpath(DATA_DIR, "BedMachineAntarctica-v3.nc"),
-    
+    bed = (BedMachineV3(), "Data/BedMachineAntarctica-v3.nc"),
+
     # Zwally drainage basins (IDs 1-27)
-    zwally_file = joinpath(DATA_DIR, "ZwallyBasins.mat"),
-    
-    # ALBMAP: mean annual temperature
-    albmap_file = joinpath(DATA_DIR, "ALBMAPv1.nc"),
-    
+    basins = (ZwallyBasins(), "Data/ZwallyBasins.mat"),
+
+    # ALBMAP: mean annual surface temperature
+    surface_temp = (ALBMAPv1(), "Data/ALBMAPv1.nc"),
+
     # Arthern accumulation data
-    arthern_file = joinpath(DATA_DIR, "amsr_accumulation_map.txt"),
-    
+    accumulation = (ArthernAccumulation(), "Data/amsr_accumulation_map.txt"),
+
     # BISICLES 3D temperature field (8 km resolution)
-    bisicles_temps_file = joinpath(DATA_DIR, "antarctica-bisicles-xyzT-8km.nc"),
-    
+    temperature = (BISICLESTemps(), "Data/antarctica-bisicles-xyzT-8km.nc"),
+
     # MEaSUREs ice velocity (1 km resolution)
-    measures_velocity_file = joinpath(DATA_DIR, "Antarctica_ice_velocity_2014_2015_1km_v01.nc"),
-    
+    velocity = (MEaSUREs(), "Data/Antarctica_ice_velocity_2014_2015_1km_v01.nc"),
+
     # Smith 2020 elevation change rates (dh/dt)
-    smith_dhdt_dir = joinpath(DATA_DIR, "Smith_2020_dhdt"),
-    
+    dhdt = (SmithDhdt(), "Data/Smith_2020_dhdt"),
+
     # ----- Grid Settings -----
     # Grid spacing: 8 km for initial testing
     dx = 8000.0,
-    
+
     # Basin selection: Basin 4 = Brunt Ice Shelf region
-    basins = [4],
-    
+    basin_ids = [4],
+
     # Velocity subsampling factor (8 for 8 km grid from 1 km source)
     sub_samp = 8,
-    
-    output_path = OUTPUT_DIR,
-    
+
+    output_path = "outputs/basin4_brunt_shelf",
+
     # Edge padding for domain clipping (in grid cells)
     clip_edge_padding = 3,
-    
+
     # Physical Parameters
     # Ice density (kg/m³)
     density_ice = 918.0,
-    
+
     # Ocean density (kg/m³)
     density_ocean = 1028.0,
-    
+
     # Minimum ice thickness (m) - thinner ice is masked out
     min_thick = 50.0
 )
@@ -70,7 +65,7 @@ params = default_constructor_params(
 # 1. init_bedmachine: Load and interpolate BedMachine data to target grid
 # 2. select_domain_wavi: Mask domain to selected basins, compute boundaries
 # 3. Write binary output files for WAVI model
-Gh, Gu, Gv, Gc = setup_wavi_data(to_dict(params); output_path=OUTPUT_DIR)
+Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/basin4_brunt_shelf")
 
 # Summary
 println("Grid Configuration:")
@@ -84,7 +79,5 @@ println("  Extent:           $(Gh.nx_clip * Gh.dx / 1000) × $(Gh.ny_clip * Gh.d
 println()
 println("Ice Statistics:")
 println("  Ice points:       $(Gh.n_clip)")
-println()
-println("Output: $(OUTPUT_DIR)/")
 
 println("\nSetup complete!")

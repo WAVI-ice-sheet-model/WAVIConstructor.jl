@@ -8,9 +8,8 @@ using ArchGDAL
 using Interpolations
 using WAVI
 
-using WAVIConstructor.DataLoading: get_arthern_accumulation, get_zwally_basins, get_albmap, 
-    get_bisicles_temps, get_frank_temps, get_measures_velocities, 
-    get_smith_dhdt, interpolate_to_grid, get_bedmachine
+using WAVIConstructor.DataSources
+using WAVIConstructor.DataLoading: load_data, interpolate_to_grid, interpolate_temperature
 
 """
     init_bedmachine(params)
@@ -25,19 +24,24 @@ Julia port of the MATLAB initBedmachineV3 function.
 Tuple of grid structures (Gh, Gu, Gv, Gc) with loaded data
 """
 function init_bedmachine(params)
-    start_data = get(params, :start_data, "BEDMACHINEV3")
-    bedmachine_file = get(params, :bedmachine_file, "Data/BedMachineAntarctica-v3.nc")
+    bed_source = get(params, :bed_source, BedMachineV3())
+    bed_file   = get(params, :bed_file, default_path(BedMachineV3()))
 
-    if uppercase(start_data) == "BEDMACHINEV3"
-        bed, x, y, geoid, mask, h, s = get_bedmachine(bedmachine_file)
+    bm = load_data(bed_source, bed_file)
+    bed       = bm.bed
+    x         = bm.x
+    y         = bm.y
+    geoid     = bm.geoid
+    mask      = bm.mask
+    h         = bm.thickness
+    s         = bm.surface
 
-        # Flip arrays for correct orientation
-        bed = reverse(bed, dims=1)
-        geoid = reverse(geoid, dims=1)
-        mask = reverse(mask, dims=1)
-        s = reverse(s, dims=1)
-        h = reverse(h, dims=1)
-    end
+    # Flip arrays for correct orientation
+    bed   = reverse(bed, dims=1)
+    geoid = reverse(geoid, dims=1)
+    mask  = reverse(mask, dims=1)
+    s     = reverse(s, dims=1)
+    h     = reverse(h, dims=1)
 
     # Create rock mask (mask=1 in BedMachine v3 indicates rock
     rockmask = zeros(size(mask))
@@ -111,43 +115,38 @@ function init_bedmachine(params)
         ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2))
     ))
     
-    # Load dhdt data if smith_dhdt_dir is provided
-    smith_dir = get(params, :smith_dhdt_dir, "Data/Smith_2020_dhdt")
-    
-    if smith_dir != "" && isdir(smith_dir)
-        smith_data = get_smith_dhdt(smith_dir=smith_dir)
+    # Load dhdt data via dispatch
+    dhdt_source = get(params, :dhdt_source, SmithDhdt())
+    dhdt_file   = get(params, :dhdt_file, default_path(SmithDhdt()))
+    smith_data  = load_data(dhdt_source, dhdt_file)
+
+    if smith_data !== nothing
+        # Interpolate grounded data
+        fdhdt_grnd = .!isnan.(smith_data.grnd_dhdt)
+        dhdt_grnd = interpolate_to_grid(
+            smith_data.grnd_xx[fdhdt_grnd][:], 
+            smith_data.grnd_yy[fdhdt_grnd][:], 
+            smith_data.grnd_dhdt[fdhdt_grnd][:], 
+            Gh.xx, Gh.yy
+        )
         
-        if smith_data !== nothing
-            # Interpolate grounded data
-            fdhdt_grnd = .!isnan.(smith_data.grnd_dhdt)
-            dhdt_grnd = interpolate_to_grid(
-                smith_data.grnd_xx[fdhdt_grnd][:], 
-                smith_data.grnd_yy[fdhdt_grnd][:], 
-                smith_data.grnd_dhdt[fdhdt_grnd][:], 
-                Gh.xx, Gh.yy
-            )
-            
-            # Interpolate floating data
-            fdhdt_flt = .!isnan.(smith_data.flt_dhdt)
-            dhdt_flt = interpolate_to_grid(
-                smith_data.flt_xx[fdhdt_flt][:], 
-                smith_data.flt_yy[fdhdt_flt][:], 
-                smith_data.flt_dhdt[fdhdt_flt][:], 
-                Gh.xx, Gh.yy
-            )
-            
-            # Combine based on surfType: floating (2) uses flt, grounded (1 or 4) uses grnd
-            dhdt = zeros(size(Gh.surfType))
-            dhdt[Gh.surfType .== 2] .= dhdt_flt[Gh.surfType .== 2]
-            dhdt[(Gh.surfType .== 1) .| (Gh.surfType .== 4)] .= dhdt_grnd[(Gh.surfType .== 1) .| (Gh.surfType .== 4)]
-            
-            Gh = merge(Gh, (dhdt = dhdt,))
-        else
-            # Return zeros if files not found
-            Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
-        end
+        # Interpolate floating data
+        fdhdt_flt = .!isnan.(smith_data.flt_dhdt)
+        dhdt_flt = interpolate_to_grid(
+            smith_data.flt_xx[fdhdt_flt][:], 
+            smith_data.flt_yy[fdhdt_flt][:], 
+            smith_data.flt_dhdt[fdhdt_flt][:], 
+            Gh.xx, Gh.yy
+        )
+        
+        # Combine based on surfType: floating (2) uses flt, grounded (1 or 4) uses grnd
+        dhdt = zeros(size(Gh.surfType))
+        dhdt[Gh.surfType .== 2] .= dhdt_flt[Gh.surfType .== 2]
+        dhdt[(Gh.surfType .== 1) .| (Gh.surfType .== 4)] .= dhdt_grnd[(Gh.surfType .== 1) .| (Gh.surfType .== 4)]
+        
+        Gh = merge(Gh, (dhdt = dhdt,))
     else
-        # Return zeros if directory not provided or doesn't exist
+        # NoData or files not found — use zeros
         Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
     end
     
@@ -201,36 +200,43 @@ end
 """
     load_additional_datasets(Gh, params)
 
-Load accumulation, basin, and ALBMAP data.
+Load accumulation, basin, and surface temperature data via dispatch on source types.
 """
 function load_additional_datasets(Gh, params)
-    # Load Arthern accumulation if file exists
-    arthern_file = get(params, :arthern_file, "Data/amsr_accumulation_map.txt")
-    if isfile(arthern_file)
-        aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation(arthern_file)
-        Gh = merge(Gh, (a_Arthern = interpolate_to_grid(aa_x, aa_y, aa_acc, Gh.xx, Gh.yy),))
+    # ── Accumulation ──────────────────────────────────────────────────
+    acc_source = get(params, :accumulation_source, ArthernAccumulation())
+    acc_file   = get(params, :accumulation_file, default_path(ArthernAccumulation()))
+    acc_data   = load_data(acc_source, acc_file)
+
+    if acc_data !== nothing
+        Gh = merge(Gh, (a_Arthern = interpolate_to_grid(acc_data.x, acc_data.y, acc_data.acc, Gh.xx, Gh.yy),))
     else
-        @warn "Arthern accumulation file not found: $arthern_file. Using zeros."
+        @warn "Accumulation data skipped (source: $(typeof(acc_source))). Using zeros."
         Gh = merge(Gh, (a_Arthern = zeros(size(Gh.xx)),))
     end
 
-    # Load Zwally basins if file exists
-    zwally_file = get(params, :zwally_file, "Data/ZwallyBasins.mat")
-    if isfile(zwally_file)
-        xx_zwally, yy_zwally, zwally_basins = get_zwally_basins(zwally_file)
-        Gh = merge(Gh, (basin_id = interpolate_to_grid(xx_zwally, yy_zwally, zwally_basins, Gh.xx, Gh.yy),))
+    # ── Drainage basins ───────────────────────────────────────────────
+    basins_source = get(params, :basins_source, ZwallyBasins())
+    basins_file   = get(params, :basins_file, default_path(ZwallyBasins()))
+    basins_data   = load_data(basins_source, basins_file)
+
+    if basins_data !== nothing
+        Gh = merge(Gh, (basin_id = interpolate_to_grid(basins_data.xx, basins_data.yy, basins_data.basins, Gh.xx, Gh.yy),))
     else
-        @warn "Zwally basins file not found: $zwally_file. Using zeros."
+        @warn "Basin data skipped (source: $(typeof(basins_source))). Using zeros."
         Gh = merge(Gh, (basin_id = zeros(size(Gh.xx)),))
     end
 
-    # Load ALBMAP (required)
-    albmap_file = get(params, :albmap_file, "Data/ALBMAPv1.nc")
-    if !isfile(albmap_file)
-        error("ALBMAP file not found: $albmap_file. Please provide the ALBMAP file or set params[:albmap_file] to the correct path.")
+    # ── Surface temperature / mean-annual temperature (ALBMAP) ────────
+    geom_source = get(params, :surface_temp_source, ALBMAPv1())
+    geom_file   = get(params, :surface_temp_file, default_path(ALBMAPv1()))
+
+    if geom_source isa NoData
+        error("Surface temperature source (e.g. ALBMAP) is required and cannot be NoData.")
     end
-    albmap_data = get_albmap(albmap_file)
-    Gh = merge(Gh, (Tma = interpolate_to_grid(albmap_data[:xx][:], albmap_data[:yy][:], albmap_data[:Tma][:], Gh.xx, Gh.yy),))
+
+    geom_data = load_data(geom_source, geom_file)
+    Gh = merge(Gh, (Tma = interpolate_to_grid(geom_data.xx[:], geom_data.yy[:], geom_data.Tma[:], Gh.xx, Gh.yy),))
 
     return Gh
 end
@@ -295,24 +301,22 @@ end
 """
     load_velocity_data(Gu, Gv, Gh, params)
 
-Load MEaSUREs ice velocity data.
+Load ice velocity data via dispatch on the velocity source type.
 """
 function load_velocity_data(Gu, Gv, Gh, params)
     sub_samp = get(params, :sub_samp, 8)
 
-    velocity_loaded = false
-    
-    # Try measures_velocity_file (if provided and exists)
-    measures_velocity_file = get(params, :measures_velocity_file, "Data/antarctica_ice_velocity_2016_2017_1km_v01.nc")
-    if measures_velocity_file != "" && isfile(measures_velocity_file)
-        xx_v, yy_v, vx, vy = get_measures_velocities(measures_velocity_file)
-        velocity_loaded = true
-    elseif measures_velocity_file != ""
-        @warn "MEaSUREs velocity file not found: $measures_velocity_file"
-    end
-    
-    if !velocity_loaded
-        @warn "Using zero velocities"
+    vel_source = get(params, :velocity_source, MEaSUREs())
+    vel_file   = get(params, :velocity_file, default_path(MEaSUREs()))
+    vel_data   = load_data(vel_source, vel_file)
+
+    if vel_data !== nothing
+        xx_v = vel_data.xx
+        yy_v = vel_data.yy
+        vx   = vel_data.vx
+        vy   = vel_data.vy
+    else
+        @warn "Velocity data skipped (source: $(typeof(vel_source))). Using zeros."
         xx_v = Gh.xx
         yy_v = Gh.yy
         vx = zeros(size(Gh.xx))
@@ -355,64 +359,29 @@ end
 """
     load_temperature_data(Gh, params)
 
-Load 3D temperature data from various sources.
+Load and interpolate 3-D temperature data onto the H-grid.
+
+The heavy lifting is fully dispatched:
+- `load_data(source, file)`             → raw `(temps, xx, yy, sigma)` NamedTuple
+- `interpolate_temperature(source, …)`  → `(temperature, sigmas)` on the H-grid
+
+Adding a new temperature source requires only those two methods —
+this orchestrator never needs to change.
 """
 function load_temperature_data(Gh, params)
-    temp_loaded = false
+    temp_source = get(params, :temperature_source, FrankTemps())
+    temp_file   = get(params, :temperature_file, default_path(FrankTemps()))
 
-    # Try frank_temps_file first (if provided and exists)
-    frank_file = get(params, :frank_temps_file, "Data/FranksTemps.mat")
-    if frank_file != "" && isfile(frank_file)
-        temp_data = get_frank_temps(frank_file)
-        temperature = zeros(size(temp_data.FranksTemps, 1), Gh.nx, Gh.ny)
-        for i in 1:size(temp_data.FranksTemps, 1)
-            # FranksTemps is (sigma_levels, ny, nx), so we need [i, :, :] to get the 2D slice
-            temperature[i, :, :] = interpolate_to_grid(
-                temp_data.xxTemp[:], temp_data.yyTemp[:], temp_data.FranksTemps[i, :, :][:],
-                Gh.xx, Gh.yy
-            )
-        end
-        sigmas = temp_data.sigmaTemp
-        temp_loaded = true
-    # Else try bisicles_temps_file (if provided and exists)
-    else
-        bisicles_file = get(params, :bisicles_temps_file, "Data/antarctica-bisicles-xyzT-8km.nc")
-        if bisicles_file != "" && isfile(bisicles_file)
-            bisicles_sigma, bisicles_x, bisicles_y, bisicles_z, bisicles_temps = get_bisicles_temps(bisicles_file)
-
-            bisicles_yy = repeat(bisicles_y, 1, length(bisicles_x))
-            bisicles_xx = repeat(bisicles_x', length(bisicles_y), 1)
-
-            temperature = zeros(length(bisicles_sigma), Gh.nx, Gh.ny)
-            bisicles_mask_full = zeros(length(bisicles_sigma), size(bisicles_xx, 1), size(bisicles_xx, 2))
-
-            for i in 1:length(bisicles_sigma)
-                bisicles_mask = bisicles_temps[i, :, :] .> 273.1480
-                bisicles_mask_full[i, :, :] = bisicles_mask
-                bisicles_temps[i, bisicles_mask_full[i, :, :] .== 1] .= NaN
-
-                this_temp = bisicles_temps[i, :, :]
-                valid_mask = .~isnan.(this_temp)
-                xx_valid = bisicles_xx[valid_mask]
-                yy_valid = bisicles_yy[valid_mask]
-                temp_valid = this_temp[valid_mask]
-
-                temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
-            end
-            sigmas = bisicles_sigma
-            temp_loaded = true
-        else
-            @warn "BISICLES temperature file not found: $bisicles_file"
-        end
+    if temp_source isa NoData
+        error("Temperature source is required and cannot be NoData.")
     end
-    
-    # Temperature data is required
-    if !temp_loaded
-        error("Temperature data is required but not found. Please provide one of:\n" *
-              "  - Frank temperature file: $(get(params, :frank_temps_file, "Data/FranksTemps.mat"))\n" *
-              "  - BISICLES temperature file: $(get(params, :bisicles_temps_file, "Data/antarctica-bisicles-xyzT-8km.nc"))\n" *
-              "Ensure the file exists and is accessible.")
-    end
+
+    temp_data = load_data(temp_source, temp_file)
+
+    # Source-specific interpolation is fully dispatched — adding a new
+    # temperature source only requires a `load_data` and an
+    # `interpolate_temperature` method; no changes here.
+    temperature, sigmas = interpolate_temperature(temp_source, temp_data, Gh)
 
     Gh = merge(Gh, (levels = (temperature = temperature, sigmas = sigmas),))
     return Gh

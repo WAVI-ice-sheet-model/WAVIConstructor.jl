@@ -1,4 +1,5 @@
 using WAVIConstructor.DataLoading
+using WAVIConstructor.DataSources
 using NCDatasets
 using ArchGDAL
 using MAT
@@ -28,7 +29,7 @@ function create_mock_matfile(tmpdir, filename, vars)
 end
 
 @testset "Data Loading Functions" begin
-    # Test get_albmap
+    # Test load_data(ALBMAPv1(), ...)
     mktempdir() do tmpdir
         mockfile = joinpath(tmpdir, "mock_albmap.nc")
         nx, ny = 4, 3
@@ -45,12 +46,12 @@ end
         end
         close(ds)
 
-        Gh = get_albmap(mockfile)
-        @test size(Gh[:h]) == (1, 12)
-        @test all(Gh[:h] .== -1.0f0)
+        Gh = load_data(ALBMAPv1(), mockfile)
+        @test size(Gh.h) == (1, 12)
+        @test all(Gh.h .== -1.0f0)
     end
 
-    # Test get_arthern_accumulation
+    # Test load_data(ArthernAccumulation(), ...)
     mktempdir() do tmpdir
         mockfile = joinpath(tmpdir, "mock_amsr_accumulation_map.txt")
         
@@ -102,41 +103,31 @@ end
             end
         end
 
-        aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation(mockfile)
+        acc_data = load_data(ArthernAccumulation(), mockfile)
 
         # Should have 9 valid rows (3 NaN rows filtered out from 12 total)
-        @test length(aa_lat) == 9
-        @test length(aa_lon) == 9
-        @test length(aa_x) == 9
-        @test length(aa_y) == 9
-        @test length(aa_acc) == 9
-        @test length(aa_err) == 9
-        @test length(aa_lat) == length(aa_lon) == length(aa_x) == length(aa_y) == length(aa_acc) == length(aa_err)
+        @test length(acc_data.x) == 9
+        @test length(acc_data.y) == 9
+        @test length(acc_data.acc) == 9
+        @test length(acc_data.x) == length(acc_data.y) == length(acc_data.acc)
         
         # No NaN values in filtered output
-        @test !any(isnan.(aa_acc))
-        @test !any(isnan.(aa_err))
+        @test !any(isnan.(acc_data.acc))
         
         # Accumulation converted from water equivalent to ice equivalent (divided by 917)
         # Original values: 450, 180, 850, 1200, 350, 680, 520, 1050, 50
         # Min ice equivalent: 50/917 ≈ 0.055
         # Max ice equivalent: 1200/917 ≈ 1.31
-        @test all(aa_acc .> 0)
-        @test minimum(aa_acc) > 0.05
-        @test maximum(aa_acc) < 1.5
-        
-        # Error values should be realistic percentages (15-25%)
-        @test minimum(aa_err) >= 15
-        @test maximum(aa_err) <= 25
+        @test all(acc_data.acc .> 0)
+        @test minimum(acc_data.acc) > 0.05
+        @test maximum(acc_data.acc) < 1.5
         
         # Verify coordinate ranges are realistic (Antarctic polar stereographic)
-        @test all(aa_lat .< -60)  # All Antarctic latitudes
-        @test all(aa_lon .>= 0) && all(aa_lon .<= 360)  # 0-360 longitude convention
-        @test all(abs.(aa_x) .< 3000000)  # Reasonable polar stereographic range
-        @test all(abs.(aa_y) .< 3000000)
+        @test all(abs.(acc_data.x) .< 3000000)  # Reasonable polar stereographic range
+        @test all(abs.(acc_data.y) .< 3000000)
     end
 
-    # Test get_bisicles_temps
+    # Test load_data(BISICLESTemps(), ...)
     mktempdir() do tmpdir
         nx, ny, nz = 4, 3, 2
         mockfile = joinpath(tmpdir, "mock_bisicles.nc")
@@ -159,22 +150,20 @@ end
         vtemp[:, :, :] .= reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
         close(ds)
 
-        sigma, x, y, z, temps = get_bisicles_temps(mockfile, scale_xy=1000)
+        data = load_data(BISICLESTemps(), mockfile, scale_xy=1000)
 
-        @test size(sigma) == (nz,)
-        @test size(x) == (nx,)
-        @test size(y) == (ny,)
-        @test size(z) == (nz,)
-        @test size(temps) == (nz, ny, nx)
-        @test all(x .== 1000 .* collect(1.0f0:nx))
-        @test all(y .== 1000 .* collect(1.0f0:ny))
-        @test all(z .== collect(1.0f0:nz))
-        @test all(sigma .== collect(0.1f0:0.1f0:0.2f0))
+        @test size(data.sigma) == (nz,)
+        @test size(data.xx) == (nx,)
+        @test size(data.yy) == (ny,)
+        @test size(data.temps) == (nz, ny, nx)
+        @test all(data.xx .== 1000 .* collect(1.0f0:nx))
+        @test all(data.yy .== 1000 .* collect(1.0f0:ny))
+        @test all(data.sigma .== collect(0.1f0:0.1f0:0.2f0))
         expected_temps = reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
-        @test all(temps .== expected_temps)
+        @test all(data.temps .== expected_temps)
     end
 
-    # Test get_frank_temps
+    # Test load_data(FrankTemps(), ...)
     mktempdir() do tmpdir
         nlevels = 3
         npoints = 10
@@ -187,21 +176,21 @@ end
             [("FranksTemps", FranksTemps), ("xxTemp", xxTemp), ("yyTemp", yyTemp), ("sigmaTemp", sigmaTemp)]
         )
 
-        temp_data = get_frank_temps(mockfile)
+        temp_data = load_data(FrankTemps(), mockfile)
 
-        @test size(temp_data.FranksTemps) == (nlevels, npoints)
-        @test length(temp_data.xxTemp) == npoints
-        @test length(temp_data.yyTemp) == npoints
-        @test length(temp_data.sigmaTemp) == nlevels
-        @test all(temp_data.FranksTemps .== FranksTemps)
-        @test all(temp_data.xxTemp .== xxTemp)
-        @test all(temp_data.yyTemp .== yyTemp)
-        @test all(temp_data.sigmaTemp .== sigmaTemp)
-        @test minimum(temp_data.FranksTemps) >= 200.0
-        @test maximum(temp_data.FranksTemps) <= 300.0
+        @test size(temp_data.temps) == (nlevels, npoints)
+        @test length(temp_data.xx) == npoints
+        @test length(temp_data.yy) == npoints
+        @test length(temp_data.sigma) == nlevels
+        @test all(temp_data.temps .== FranksTemps)
+        @test all(temp_data.xx .== xxTemp)
+        @test all(temp_data.yy .== yyTemp)
+        @test all(temp_data.sigma .== sigmaTemp)
+        @test minimum(temp_data.temps) >= 200.0
+        @test maximum(temp_data.temps) <= 300.0
     end
 
-    # Test get_measures_velocities
+    # Test load_data(MEaSUREs(), ...)
     mktempdir() do tmpdir
         mockfile = joinpath(tmpdir, "mock_measures.nc")
         nx, ny = 4, 3
@@ -218,19 +207,19 @@ end
         vVY[:, :] .= reshape(collect(1.0f0:(nx*ny)), nx, ny)
         close(ds)
 
-        xx, yy, vx, vy = get_measures_velocities(mockfile)
+        data = load_data(MEaSUREs(), mockfile)
 
-        @test size(xx) == (nx, ny)
-        @test size(yy) == (nx, ny)
-        @test size(vx) == (nx, ny)
-        @test size(vy) == (nx, ny)
-        @test all(xx .== repeat(collect(1.0f0:nx), 1, ny))
-        @test all(yy .== repeat(collect(1.0f0:ny)', nx, 1))
-        @test all(vx .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
-        @test all(vy .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
+        @test size(data.xx) == (nx, ny)
+        @test size(data.yy) == (nx, ny)
+        @test size(data.vx) == (nx, ny)
+        @test size(data.vy) == (nx, ny)
+        @test all(data.xx .== repeat(collect(1.0f0:nx), 1, ny))
+        @test all(data.yy .== repeat(collect(1.0f0:ny)', nx, 1))
+        @test all(data.vx .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
+        @test all(data.vy .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
     end
 
-    # Test get_smith_dhdt
+    # Test load_data(SmithDhdt(), ...)
     mktempdir() do tmpdir
         width, height = 4, 3
         dx, dy = 10.0, -10.0
@@ -242,7 +231,7 @@ end
         flt_file = create_mock_geotiff(tmpdir, "mock_smith_flt.tif", width, height, dx, dy, mapx, mapy,
             permutedims(mock_dhdt .* 0.5, (2, 1)))
 
-        result = get_smith_dhdt(grnd_file=grnd_file, flt_file=flt_file)
+        result = load_data(SmithDhdt(), "", grnd_file=grnd_file, flt_file=flt_file)
         
         # The function flips data with reverse(dhdt, dims=1), so expected data should be flipped
         expected_grnd = reverse(mock_dhdt, dims=1)
@@ -265,7 +254,7 @@ end
         @test all(result.flt_dhdt .≈ expected_flt)
     end
 
-    # Test get_zwally_basins
+    # Test load_data(ZwallyBasins(), ...)
     mktempdir() do tmpdir
         # Create a more realistic mock: 20x20 grid with realistic Antarctic coordinates
         # and realistic basin IDs (1-27 range) with contiguous regions
@@ -307,24 +296,24 @@ end
             [("xxZwallyBasins", xx_zwally_full), ("yyZwallyBasins", yy_zwally_full), ("ZwallyBasins", zwally_basins_full)]
         )
 
-        xx_zwally, yy_zwally, zwally_basins = get_zwally_basins(mockfile)
+        data = load_data(ZwallyBasins(), mockfile)
 
         # Count expected valid points (basin > 0)
         expected_count = count(x -> x > 0, zwally_basins_full)
         
-        @test length(xx_zwally) == expected_count
-        @test length(yy_zwally) == expected_count
-        @test length(zwally_basins) == expected_count
-        @test length(xx_zwally) == length(yy_zwally) == length(zwally_basins)
-        @test all(zwally_basins .> 0)
-        @test minimum(zwally_basins) >= 1
-        @test maximum(zwally_basins) <= 27
+        @test length(data.xx) == expected_count
+        @test length(data.yy) == expected_count
+        @test length(data.basins) == expected_count
+        @test length(data.xx) == length(data.yy) == length(data.basins)
+        @test all(data.basins .> 0)
+        @test minimum(data.basins) >= 1
+        @test maximum(data.basins) <= 27
         
         # Verify coordinate ranges are realistic (Antarctic extent)
-        @test minimum(xx_zwally) >= -3000000.0
-        @test maximum(xx_zwally) <= 3000000.0
-        @test minimum(yy_zwally) >= -3000000.0
-        @test maximum(yy_zwally) <= 3000000.0
+        @test minimum(data.xx) >= -3000000.0
+        @test maximum(data.xx) <= 3000000.0
+        @test minimum(data.yy) >= -3000000.0
+        @test maximum(data.yy) <= 3000000.0
     end
 
     # Test geotiff_read_axis_only
@@ -358,41 +347,27 @@ end
     arthern_file = "Data/amsr_accumulation_map.txt"
     if isfile(arthern_file)
         @testset "Real Arthern Accumulation File" begin
-            aa_lat, aa_lon, aa_x, aa_y, aa_acc, aa_err = get_arthern_accumulation(arthern_file)
+            acc_data = load_data(ArthernAccumulation(), arthern_file)
             
             # File should contain valid data points
-            @test length(aa_lat) > 0
-            @test length(aa_lat) == length(aa_lon) == length(aa_x) == length(aa_y) == length(aa_acc) == length(aa_err)
+            @test length(acc_data.x) > 0
+            @test length(acc_data.x) == length(acc_data.y) == length(acc_data.acc)
             
             # No NaN values in filtered output
-            @test !any(isnan.(aa_acc))
-            @test !any(isnan.(aa_lat))
-            @test !any(isnan.(aa_x))
-            
-            # Latitude should be Antarctic (south of 60°S)
-            @test all(aa_lat .< -60)
-            @test all(aa_lat .>= -90)
-            
-            # Longitude should be in 0-360 convention
-            @test all(aa_lon .>= 0)
-            @test all(aa_lon .<= 360)
+            @test !any(isnan.(acc_data.acc))
+            @test !any(isnan.(acc_data.x))
             
             # X and Y should be in reasonable polar stereographic range (within ~3000 km of pole)
-            @test all(abs.(aa_x) .< 3500000)
-            @test all(abs.(aa_y) .< 3500000)
+            @test all(abs.(acc_data.x) .< 3500000)
+            @test all(abs.(acc_data.y) .< 3500000)
             
             # Accumulation (ice equivalent) should be positive and reasonable
             # Original water equiv is ~50-2000 kg/m²/a, so ice equiv is ~0.05-2.2 m/a
-            @test all(aa_acc .> 0)
-            @test minimum(aa_acc) > 0.01  # At least 10 mm/a
-            @test maximum(aa_acc) < 5.0   # Less than 5 m/a
+            @test all(acc_data.acc .> 0)
+            @test minimum(acc_data.acc) > 0.01  # At least 10 mm/a
+            @test maximum(acc_data.acc) < 5.0   # Less than 5 m/a
             
-            # Error percentages should be reasonable (typically 5-30%)
-            @test all(aa_err .> 0)
-            @test minimum(aa_err) >= 5    # At least 5%
-            @test maximum(aa_err) < 50    # Less than 50%
-            
-            @info "Loaded $(length(aa_acc)) valid accumulation data points from real file"
+            @info "Loaded $(length(acc_data.acc)) valid accumulation data points from real file"
         end
     else
         @warn "Skipping Arthern accumulation integration test: file not found at $arthern_file"
@@ -402,29 +377,29 @@ end
     zwally_file = "Data/ZwallyBasins.mat"
     if isfile(zwally_file)
         @testset "Real Zwally Basins File" begin
-            xx_zwally, yy_zwally, zwally_basins = get_zwally_basins(zwally_file)
+            data = load_data(ZwallyBasins(), zwally_file)
             
             # File should contain valid data points
-            @test length(xx_zwally) > 0
-            @test length(xx_zwally) == length(yy_zwally) == length(zwally_basins)
+            @test length(data.xx) > 0
+            @test length(data.xx) == length(data.yy) == length(data.basins)
             
             # All basin IDs should be positive (filtered out zeros)
-            @test all(zwally_basins .> 0)
+            @test all(data.basins .> 0)
             
             # Basin IDs should be in valid range (1-27 for Zwally drainage basins)
-            @test minimum(zwally_basins) >= 1
-            @test maximum(zwally_basins) <= 27
+            @test minimum(data.basins) >= 1
+            @test maximum(data.basins) <= 27
             
             # Coordinates should be in reasonable polar stereographic range
-            @test all(abs.(xx_zwally) .< 4000000)
-            @test all(abs.(yy_zwally) .< 4000000)
+            @test all(abs.(data.xx) .< 4000000)
+            @test all(abs.(data.yy) .< 4000000)
             
             # Check that multiple basins are represented
-            unique_basins = unique(zwally_basins)
+            unique_basins = unique(data.basins)
             @test length(unique_basins) > 1  # Should have more than 1 basin
             
-            @info "Loaded $(length(zwally_basins)) valid basin data points from real file"
-            @info "Unique basin IDs: $(sort(unique(zwally_basins)))"
+            @info "Loaded $(length(data.basins)) valid basin data points from real file"
+            @info "Unique basin IDs: $(sort(unique(data.basins)))"
         end
     else
         @warn "Skipping Zwally basins integration test: file not found at $zwally_file"
