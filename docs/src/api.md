@@ -1,6 +1,6 @@
 # API Reference
 
-This page documents the main exported functions and types in WAVIConstructor.jl. The package provides a dispatch-based architecture where each geophysical dataset is identified by a singleton source type (e.g. `BedMachineV3`, `BISICLESTemps`), and all loading is routed through `load_data`.
+This page documents the main exported functions and types in WAVIConstructor.jl. Each dataset has its own label type (e.g. `BedMachineV3`, `BISICLESTemps`), and passing that label to `load_data` automatically calls the right loading code for it.
 
 ## Main Workflow Functions
 
@@ -39,7 +39,7 @@ WAVIConstructor.DataSources.default_path
 Each data category has its own abstract subtype of `DataSource`:
 
 - `BedSource` — bed topography (e.g. `BedMachineV3`)
-- `GeometrySource` — large-scale geometry / mean-annual temperature (e.g. `ALBMAPv1`)
+- `SurfaceTempSource` — mean annual surface temperature (e.g. `ALBMAPv1`)
 - `TemperatureSource` — 3-D temperature fields (e.g. `FrankTemps`, `BISICLESTemps`)
 - `VelocitySource` — ice velocity (e.g. `MEaSUREs`)
 - `AccumulationSource` — snow accumulation (e.g. `ArthernAccumulation`)

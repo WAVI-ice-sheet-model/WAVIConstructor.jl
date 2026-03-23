@@ -49,7 +49,7 @@ Use `NoData()` for optional categories you want to skip.
 Base.@kwdef struct ConstructorParams
     # ── Data sources (SourceConfig per category) ─────────────────────
     bed::SourceConfig{<:Union{BedSource,NoData}}              = SourceConfig(BedMachineV3())
-    geometry::SourceConfig{<:Union{GeometrySource,NoData}}    = SourceConfig(ALBMAPv1())
+    geometry::SourceConfig{<:Union{SurfaceTempSource,NoData}}    = SourceConfig(ALBMAPv1())
     temperature::SourceConfig{<:Union{TemperatureSource,NoData}} = SourceConfig(FrankTemps())
     velocity::SourceConfig{<:Union{VelocitySource,NoData}}    = SourceConfig(MEaSUREs())
     accumulation::SourceConfig{<:Union{AccumulationSource,NoData}} = SourceConfig(ArthernAccumulation())

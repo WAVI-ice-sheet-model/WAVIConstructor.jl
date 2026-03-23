@@ -12,7 +12,7 @@ module DataSources
 
 export DataSource, SourceConfig, default_path
 # Category abstract types
-export BedSource, GeometrySource, TemperatureSource, VelocitySource
+export BedSource, SurfaceTempSource, TemperatureSource, VelocitySource
 export AccumulationSource, DhDtSource, BasinSource
 # Concrete source singletons
 export BedMachineV3, ALBMAPv1, FrankTemps, BISICLESTemps
@@ -35,8 +35,8 @@ abstract type DataSource end
 """Bed topography / geometry sources (e.g. BedMachine)."""
 abstract type BedSource       <: DataSource end
 
-"""Large-scale geometry / mean-annual-temperature sources (e.g. ALBMAP)."""
-abstract type GeometrySource  <: DataSource end
+"""Mean annual surface temperature sources (e.g. ALBMAP)."""
+abstract type SurfaceTempSource  <: DataSource end
 
 """3-D temperature field sources."""
 abstract type TemperatureSource <: DataSource end
@@ -78,7 +78,7 @@ struct BedMachineV3 <: BedSource end
 default_path(::BedMachineV3) = "Data/BedMachineAntarctica-v3.nc"
 
 """ALBMAP v1 Antarctic geometry / mean-annual temperature."""
-struct ALBMAPv1 <: GeometrySource end
+struct ALBMAPv1 <: SurfaceTempSource end
 default_path(::ALBMAPv1) = "Data/ALBMAPv1.nc"
 
 """Frank 3-D temperature field (.mat)."""
