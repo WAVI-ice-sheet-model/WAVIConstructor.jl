@@ -2,7 +2,7 @@
 
 Pre-processing library for [WAVI.jl](https://github.com/WAVI-ice-sheet-model/WAVI.jl).
 
-WAVIConstructor reads Antarctic geophysical datasets (bed topography, ice velocity, temperature, accumulation, elevation-change rates, drainage basins), interpolates them onto a common Arakawa C-grid, selects a regional domain, and writes binary files ready for WAVI inversion runs.
+WAVIConstructor reads geophysical datasets (bed topography, ice velocity, temperature, accumulation, elevation-change rates, drainage basins), interpolates them onto a common grid, selects a regional domain, and writes files ready for WAVI inversion runs.
 
 ## Architecture
 
