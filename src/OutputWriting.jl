@@ -36,62 +36,53 @@ const _V_GRID_VARS = [
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+const _H_FIELD_MAP = Dict(
+    "thickness"         => :h_clip,
+    "surface"           => :s_clip,
+    "bed"               => :b_clip,
+    "h_mask"            => :mask_clip,
+    "basinID"           => :basinID_clip,
+    "accumulation_data" => :a_Arthern_clip,
+    "dhdt_data"         => :dhdt_clip,
+    "dhdt_acc_mask"     => :dhdtAccDataMask_clip,
+)
+
+const _U_FIELD_MAP = Dict(
+    "udata"      => :uData_clip,
+    "udata_mask" => :uDataMaskFull_clip,
+    "u_iszero"   => :uiszero_clip,
+)
+
+const _V_FIELD_MAP = Dict(
+    "vdata"      => :vData_clip,
+    "vdata_mask" => :vDataMaskFull_clip,
+    "v_iszero"   => :viszero_clip,
+)
+
 """
-    _collect_field_pairs(Gh, Gu, Gv)
+    _collect_grid_fields(grid, var_meta, field_map)
 
-Gather all (name, long_name, units, standard_name, data) tuples from the
-clipped grids.  Returns a `Vector{Tuple}`.
+Return `Vector{Tuple{String, String, String, Union{String,Nothing}, AbstractArray}}`
+for every variable whose backing field exists on `grid`.
 """
-function _collect_field_pairs(Gh, Gu, Gv)
-    # Mapping from output variable name → actual grid field symbol
-    h_field_map = Dict(
-        "thickness"         => :h_clip,
-        "surface"           => :s_clip,
-        "bed"               => :b_clip,
-        "h_mask"            => :mask_clip,
-        "basinID"           => :basinID_clip,
-        "accumulation_data" => :a_Arthern_clip,
-        "dhdt_data"         => :dhdt_clip,
-        "dhdt_acc_mask"     => :dhdtAccDataMask_clip,
-    )
-    u_field_map = Dict(
-        "udata"      => :uData_clip,
-        "udata_mask" => :uDataMaskFull_clip,
-        "u_iszero"   => :uiszero_clip,
-    )
-    v_field_map = Dict(
-        "vdata"      => :vData_clip,
-        "vdata_mask" => :vDataMaskFull_clip,
-        "v_iszero"   => :viszero_clip,
-    )
-
-    pairs_out = Vector{Tuple{String, String, String, Union{String,Nothing}, AbstractArray}}()
-
-    for (name, long_name, units, std_name) in _H_GRID_VARS
-        field = h_field_map[name]
-        if haskey(Gh, field)
-            data = getproperty(Gh, field)
-            push!(pairs_out, (name, long_name, units, std_name, data))
+function _collect_grid_fields(grid, var_meta, field_map)
+    out = Vector{Tuple{String, String, String, Union{String,Nothing}, AbstractArray}}()
+    for (name, long_name, units, std_name) in var_meta
+        field = field_map[name]
+        if haskey(grid, field)
+            push!(out, (name, long_name, units, std_name, getproperty(grid, field)))
         end
     end
+    return out
+end
 
-    for (name, long_name, units, std_name) in _U_GRID_VARS
-        field = u_field_map[name]
-        if haskey(Gu, field)
-            data = getproperty(Gu, field)
-            push!(pairs_out, (name, long_name, units, std_name, data))
-        end
-    end
+_collect_h_fields(Gh) = _collect_grid_fields(Gh, _H_GRID_VARS, _H_FIELD_MAP)
+_collect_u_fields(Gu) = _collect_grid_fields(Gu, _U_GRID_VARS, _U_FIELD_MAP)
+_collect_v_fields(Gv) = _collect_grid_fields(Gv, _V_GRID_VARS, _V_FIELD_MAP)
 
-    for (name, long_name, units, std_name) in _V_GRID_VARS
-        field = v_field_map[name]
-        if haskey(Gv, field)
-            data = getproperty(Gv, field)
-            push!(pairs_out, (name, long_name, units, std_name, data))
-        end
-    end
-
-    return pairs_out
+"""Collect all fields across H, U, V grids (used by binary writer)."""
+function _collect_all_fields(Gh, Gu, Gv)
+    return vcat(_collect_h_fields(Gh), _collect_u_fields(Gu), _collect_v_fields(Gv))
 end
 
 # ── Binary writing ────────────────────────────────────────────────────
@@ -106,7 +97,7 @@ as `temps.bin` and the sigma coordinate as `sigma_grid.bin`.
 function write_binary_files(Gh, Gu, Gv, output_path)
     mkpath(output_path)
 
-    field_pairs = _collect_field_pairs(Gh, Gu, Gv)
+    field_pairs = _collect_all_fields(Gh, Gu, Gv)
 
     for (name, _, _, _, data) in field_pairs
         filepath = joinpath(output_path, name * ".bin")
@@ -176,14 +167,20 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
     # ── Determine dimensions ──────────────────────────────────────────
     nx_h, ny_h = Gh.nx_clip, Gh.ny_clip
 
+    # U-grid and V-grid are staggered and may differ in size
+    u_fields = _collect_u_fields(Gu)
+    v_fields = _collect_v_fields(Gv)
+    nx_u, ny_u = isempty(u_fields) ? (nx_h, ny_h) : size(u_fields[1][5])
+    nx_v, ny_v = isempty(v_fields) ? (nx_h, ny_h) : size(v_fields[1][5])
+
     has_temp = haskey(Gh, :levels) &&
                haskey(Gh.levels, :temperature_clip) &&
                haskey(Gh.levels, :sigma_full)
     nz = has_temp ? length(Gh.levels.sigma_full) : 0
 
     # ── Coordinate vectors ────────────────────────────────────────────
-    x_vec = Gh.xx_clip[:, 1]   # x coords along first column
-    y_vec = Gh.yy_clip[1, :]   # y coords along first row
+    x_h = Gh.xx_clip[:, 1]   # H-grid x coords
+    y_h = Gh.yy_clip[1, :]   # H-grid y coords
 
     # ── Create file ───────────────────────────────────────────────────
     ds = NCDataset(filepath, "c")
@@ -207,22 +204,51 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
         ds.attrib["projection"] = "Antarctic Polar Stereographic (EPSG:3031)"
         ds.attrib["fill_value_convention"] = "-9999.0 used for masked / missing values"
 
-        # — Dimensions & coordinate variables —
+        # — H-grid dimensions & coordinate variables —
         defDim(ds, "x", nx_h)
         defDim(ds, "y", ny_h)
 
         xvar = defVar(ds, "x", Float64, ("x",))
-        xvar.attrib["long_name"] = "Easting"
+        xvar.attrib["long_name"] = "Easting (H-grid)"
         xvar.attrib["units"]     = "m"
         xvar.attrib["standard_name"] = "projection_x_coordinate"
-        xvar[:] = x_vec
+        xvar[:] = x_h
 
         yvar = defVar(ds, "y", Float64, ("y",))
-        yvar.attrib["long_name"] = "Northing"
+        yvar.attrib["long_name"] = "Northing (H-grid)"
         yvar.attrib["units"]     = "m"
         yvar.attrib["standard_name"] = "projection_y_coordinate"
-        yvar[:] = y_vec
+        yvar[:] = y_h
 
+        # — U-grid dimensions (staggered in x) —
+        if !isempty(u_fields)
+            defDim(ds, "xu", nx_u)
+            defDim(ds, "yu", ny_u)
+            xu_var = defVar(ds, "xu", Float64, ("xu",))
+            xu_var.attrib["long_name"] = "Easting (U-grid, staggered in x)"
+            xu_var.attrib["units"]     = "m"
+            xu_var[:] = haskey(Gu, :xx) ? Gu.xx[1:nx_u, 1] : collect(1.0:nx_u)
+            yu_var = defVar(ds, "yu", Float64, ("yu",))
+            yu_var.attrib["long_name"] = "Northing (U-grid)"
+            yu_var.attrib["units"]     = "m"
+            yu_var[:] = haskey(Gu, :yy) ? Gu.yy[1, 1:ny_u] : collect(1.0:ny_u)
+        end
+
+        # — V-grid dimensions (staggered in y) —
+        if !isempty(v_fields)
+            defDim(ds, "xv", nx_v)
+            defDim(ds, "yv", ny_v)
+            xv_var = defVar(ds, "xv", Float64, ("xv",))
+            xv_var.attrib["long_name"] = "Easting (V-grid)"
+            xv_var.attrib["units"]     = "m"
+            xv_var[:] = haskey(Gv, :xx) ? Gv.xx[1:nx_v, 1] : collect(1.0:nx_v)
+            yv_var = defVar(ds, "yv", Float64, ("yv",))
+            yv_var.attrib["long_name"] = "Northing (V-grid, staggered in y)"
+            yv_var.attrib["units"]     = "m"
+            yv_var[:] = haskey(Gv, :yy) ? Gv.yy[1, 1:ny_v] : collect(1.0:ny_v)
+        end
+
+        # — Sigma dimension —
         if has_temp
             defDim(ds, "sigma", nz)
             svar = defVar(ds, "sigma", Float64, ("sigma",))
@@ -233,15 +259,38 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
             svar[:] = Gh.levels.sigma_full
         end
 
-        # — 2-D data variables on H-grid (x, y) —
-        field_pairs = _collect_field_pairs(Gh, Gu, Gv)
         fill_val = -9999.0
 
-        for (name, long_name, units, std_name, data) in field_pairs
-            v = defVar(ds, name, Float64, ("x", "y"),
-                       fillvalue = fill_val)
+        # — H-grid variables (x, y) —
+        for (name, long_name, units, std_name, data) in _collect_h_fields(Gh)
+            v = defVar(ds, name, Float64, ("x", "y"), fillvalue = fill_val)
             v.attrib["long_name"] = long_name
             v.attrib["units"]     = units
+            v.attrib["grid"]      = "h_grid"
+            if std_name !== nothing
+                v.attrib["standard_name"] = std_name
+            end
+            v[:, :] = Float64.(data)
+        end
+
+        # — U-grid variables (xu, yu) —
+        for (name, long_name, units, std_name, data) in u_fields
+            v = defVar(ds, name, Float64, ("xu", "yu"), fillvalue = fill_val)
+            v.attrib["long_name"] = long_name
+            v.attrib["units"]     = units
+            v.attrib["grid"]      = "u_grid"
+            if std_name !== nothing
+                v.attrib["standard_name"] = std_name
+            end
+            v[:, :] = Float64.(data)
+        end
+
+        # — V-grid variables (xv, yv) —
+        for (name, long_name, units, std_name, data) in v_fields
+            v = defVar(ds, name, Float64, ("xv", "yv"), fillvalue = fill_val)
+            v.attrib["long_name"] = long_name
+            v.attrib["units"]     = units
+            v.attrib["grid"]      = "v_grid"
             if std_name !== nothing
                 v.attrib["standard_name"] = std_name
             end
