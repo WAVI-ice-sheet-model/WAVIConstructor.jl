@@ -133,7 +133,7 @@ using NCDatasets
     # ── Test ConstructorParams output_format field ───────────────────
     @testset "ConstructorParams output_format" begin
         p_default = WAVIConstructor.default_constructor_params()
-        @test p_default.output_format == :bin
+        @test p_default.output_format == :netcdf
 
         p_nc = WAVIConstructor.default_constructor_params(output_format = :netcdf)
         @test p_nc.output_format == :netcdf
