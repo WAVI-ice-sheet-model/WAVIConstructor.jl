@@ -35,7 +35,8 @@ Use `NoData()` for optional categories you want to skip.
 - `basin_ids`: Basin IDs to include (can be range or array)
 
 ## Output Parameters
-- `output_path::String`: Output directory for binary files
+- `output_path::String`: Output directory for data files
+- `output_format::Symbol`: Output format — `:bin`, `:netcdf`, or `:both`
 - `clip_edge_padding::Int`: Padding around clipped domain
 
 ## Physical Constants
@@ -62,6 +63,7 @@ Base.@kwdef struct ConstructorParams
 
     # ── Output parameters ────────────────────────────────────────────
     output_path::String = "wavi_input"
+    output_format::Symbol = :bin          # :bin, :netcdf, or :both
     clip_edge_padding::Int = 3
 
     # ── Physical constants ───────────────────────────────────────────
@@ -113,6 +115,7 @@ function to_dict(params::ConstructorParams)
         :dx              => params.dx,
         :basins          => params.basin_ids,
         :output_path     => params.output_path,
+        :output_format   => params.output_format,
         :clip_edge_padding => params.clip_edge_padding,
         :density_ice     => params.density_ice,
         :density_ocean   => params.density_ocean,
