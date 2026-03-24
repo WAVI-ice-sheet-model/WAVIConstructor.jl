@@ -36,12 +36,12 @@ function init_bedmachine(params)
     h         = bm.thickness
     s         = bm.surface
 
-    # Flip arrays for correct orientation
-    bed   = reverse(bed, dims=1)
-    geoid = reverse(geoid, dims=1)
-    mask  = reverse(mask, dims=1)
-    s     = reverse(s, dims=1)
-    h     = reverse(h, dims=1)
+    # Flip arrays to match MATLAB's fliplr (reverse along dimension 2 = columns/y-axis)
+    bed   = reverse(bed, dims=2)
+    geoid = reverse(geoid, dims=2)
+    mask  = reverse(mask, dims=2)
+    s     = reverse(s, dims=2)
+    h     = reverse(h, dims=2)
 
     # Create rock mask (mask=1 in BedMachine v3 indicates rock
     rockmask = zeros(size(mask))
@@ -323,7 +323,7 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = zeros(size(Gh.yy))
     end
 
-    # Apply subsampling if needed
+    # Apply subsampling
     if sub_samp < 1.0
         xx_v = xx_v[1:1:end, 1:1:end]
         yy_v = yy_v[1:1:end, 1:1:end]
@@ -336,6 +336,10 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = vy[1:sub_samp:end, 1:sub_samp:end]
     end
 
+    # Nearest-neighbour interpolation onto the staggered U / V grids,
+    # matching MATLAB's TriScatteredInterp(…, 'nearest').
+    # NaN source values are included (as MATLAB does) so that target
+    # points whose nearest source is NaN also become NaN.
     u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy)
     v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy)
     
