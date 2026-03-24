@@ -81,6 +81,16 @@ WAVIConstructor.DataLoading.interpolate_temperature
 WAVIConstructor.DataLoading.geotiff_read_axis_only
 ```
 
+## Output Writing
+
+Functions for writing WAVI model input data in binary and/or NetCDF format.
+
+```@docs
+WAVIConstructor.OutputWriting.write_output
+WAVIConstructor.OutputWriting.write_binary_files
+WAVIConstructor.OutputWriting.write_netcdf_file
+```
+
 ## Internal Functions
 
 Additional internal functions and helpers are automatically documented below:

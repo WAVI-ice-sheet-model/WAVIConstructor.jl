@@ -59,7 +59,7 @@ params = default_constructor_params(
     min_thick = 50.0,
 
     # Output format: :bin, :netcdf, or :both
-    output_format = :netcdf
+    output_format = :both
 )
 
 # Run WAVI Data Setup

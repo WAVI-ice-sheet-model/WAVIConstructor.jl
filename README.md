@@ -112,18 +112,59 @@ vel.vx   # x-velocity component
 
 ## Outputs
 
-After running `setup_wavi_data()`, you'll have binary `.bin` files in your output directory containing:
+`setup_wavi_data()` writes all prepared fields to your `output_path` directory.
+The output format is controlled by the `output_format` parameter on `ConstructorParams`:
 
-- Grid geometry (coordinates, spacing)
-- Ice thickness
-- Bed topography
-- Surface elevation
-- Velocities (u, v components)
-- Temperature fields
-- Accumulation rates
-- Domain masks
+| Value      | Description                                             |
+|:-----------|:--------------------------------------------------------|
+| `:netcdf`  | **(default)** Single CF-compliant NetCDF-4 file (`wavi_input.nc`) |
+| `:bin`     | Raw Float64 binary files (one `.bin` per variable)      |
+| `:both`    | Write both formats side by side                         |
 
-These files are in the format expected by WAVI.jl.
+### NetCDF output
+
+The default `:netcdf` format produces a single `wavi_input.nc` file containing all
+variables with full CF-1.8 metadata:
+
+- **Coordinate variables**: `x`, `y` (H-grid), `xu`/`yu` (U-grid), `xv`/`yv` (V-grid), `sigma` (depth)
+- **Per-variable attributes**: `long_name`, `units`, `standard_name`, `_FillValue`
+- **Global attributes**: grid spacing, domain origin, projection (EPSG:3031), basin IDs, creation timestamp
+
+H-grid, U-grid (staggered in x), and V-grid (staggered in y) variables are stored
+on their own dimension pairs so sizes are always correct.
+
+### Binary output
+
+The `:bin` format writes one file per variable as raw column-major Float64 arrays:
+
+- `thickness.bin`, `surface.bin`, `bed.bin` — ice geometry
+- `h_mask.bin` — domain mask
+- `udata.bin`, `vdata.bin` — velocity components
+- `udata_mask.bin`, `vdata_mask.bin` — velocity data masks
+- `u_iszero.bin`, `v_iszero.bin` — velocity zero masks
+- `accumulation_data.bin`, `dhdt_data.bin` — forcing fields
+- `dhdt_acc_mask.bin` — combined data mask
+- `basinID.bin` — basin identifiers
+- `temps.bin` — 3-D temperature field (nx × ny × nz)
+- `sigma_grid.bin` — sigma coordinate vector
+
+### Choosing the format
+
+```julia
+# NetCDF (default)
+params = default_constructor_params(basin_ids = [4])
+
+# Binary
+params = default_constructor_params(basin_ids = [4], output_format = :bin)
+
+# Both
+params = default_constructor_params(basin_ids = [4], output_format = :both)
+
+# Or override at call time:
+Gh, Gu, Gv, Gc = setup_wavi_data(params; output_format = :netcdf)
+```
+
+All output files are in the format expected by [WAVI.jl](https://github.com/WAVI-ice-sheet-model/WAVI.jl).
 
 ## Data Source Configuration
 
@@ -143,16 +184,17 @@ Each data category is specified as a `SourceConfig{S}` pairing a source type wit
 
 ### Scalar / processing parameters
 
-| Parameter          | Description                      | Default    |
-|:-------------------|:---------------------------------|:-----------|
-| `dx`               | Grid spacing (m)                 | `10000.0`  |
-| `basin_ids`        | Zwally basin IDs to include      | `1:27`     |
+| Parameter          | Description                      | Default      |
+|:-------------------|:---------------------------------|:-------------|
+| `dx`               | Grid spacing (m)                 | `10000.0`    |
+| `basin_ids`        | Zwally basin IDs to include      | `1:27`       |
 | `output_path`      | Directory for output files       | `"wavi_input"` |
-| `clip_edge_padding`| Edge padding when clipping       | `3`        |
-| `density_ice`      | Ice density (kg/m³)              | `918.0`    |
-| `density_ocean`    | Ocean density (kg/m³)            | `1028.0`   |
-| `min_thick`        | Minimum ice thickness (m)        | `50.0`     |
-| `sub_samp`         | Velocity subsampling factor      | `8`        |
+| `output_format`    | Output format (`:bin`, `:netcdf`, `:both`) | `:netcdf` |
+| `clip_edge_padding`| Edge padding when clipping       | `3`          |
+| `density_ice`      | Ice density (kg/m³)              | `918.0`      |
+| `density_ocean`    | Ocean density (kg/m³)            | `1028.0`     |
+| `min_thick`        | Minimum ice thickness (m)        | `50.0`       |
+| `sub_samp`         | Velocity subsampling factor      | `8`          |
 
 ### Adding a new data source
 
