@@ -63,7 +63,7 @@ Base.@kwdef struct ConstructorParams
 
     # ── Output parameters ────────────────────────────────────────────
     output_path::String = "wavi_input"
-    output_format::Symbol = :bin          # :bin, :netcdf, or :both
+    output_format::Symbol = :netcdf       # :bin, :netcdf, or :both
     clip_edge_padding::Int = 3
 
     # ── Physical constants ───────────────────────────────────────────
