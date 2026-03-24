@@ -9,19 +9,21 @@ using WAVIConstructor.InitBedMachine: init_bedmachine
 using WAVIConstructor.DomainSelection: select_domain_wavi
 using WAVIConstructor.ParamHelpers: ConstructorParams, to_dict
 using WAVIConstructor.DataSources: BedMachineV3, NoData
+using WAVIConstructor.OutputWriting: write_output
 
 export setup_wavi_data
 
 """
-    setup_wavi_data(params; output_path="outputs", edge=3)
+    setup_wavi_data(params; output_path="outputs", edge=3, output_format=:bin)
 
 Complete setup workflow for WAVI data preparation.
 Julia port of MATLAB get_setup_data function.
 
 # Arguments
 - `params`: NamedTuple with all WAVI parameters
-- `output_path`: Directory to write binary output files (default: "outputs")
+- `output_path`: Directory to write output files (default: "outputs")
 - `edge`: Edge padding for domain clipping (default: 3)
+- `output_format`: Output format — `:bin`, `:netcdf`, or `:both` (default: `:netcdf`)
 
 # Returns
 - Modified grid structures (Gh, Gu, Gv, Gc) with clipped data
@@ -32,9 +34,9 @@ Julia port of MATLAB get_setup_data function.
 - Clips domain to remove unused basins
 - Replaces NaNs with -9999 outside masks
 - Extrapolates temperature to include surface (sigma=0) and base (sigma=1)
-- Writes binary files for Julia inversion
+- Writes output files for Julia inversion in the requested format(s)
 """
-function setup_wavi_data(params; output_path="outputs", edge=3)
+function setup_wavi_data(params; output_path="outputs", edge=3, output_format=nothing)
     # Validate subsampling parameters
     sub_samp = get(params, :sub_samp, 8)
     sub_samp_index_x = get(params, :sub_samp_index_x, 0)
@@ -190,8 +192,17 @@ function setup_wavi_data(params; output_path="outputs", edge=3)
     # Extrapolate temperature to include surface (sigma=0) and base (sigma=1)
     Gh = extrapolate_temperature(Gh, I_clip_min, I_clip_max, J_clip_min, J_clip_max)
     
-    # Write binary files
-    write_binary_files(Gh, Gu, Gv, output_path)
+    # Determine output format: explicit kwarg > params dict > default (:bin)
+    fmt = if output_format !== nothing
+        output_format
+    elseif isa(params, AbstractDict) && haskey(params, :output_format)
+        params[:output_format]
+    else
+        :netcdf
+    end
+
+    # Write output files in the requested format(s)
+    write_output(Gh, Gu, Gv, output_path; format=fmt)
     
     return Gh, Gu, Gv, Gc
 end
@@ -344,53 +355,6 @@ function extrapolate_temperature(Gh, I_min, I_max, J_min, J_max)
             temperature_clip = temps_for_julia_clip,
         )),
     ))
-end
-
-"""
-    write_binary_files(Gh, Gu, Gv, output_path)
-
-Write all clipped data to binary files for Julia inversion.
-"""
-function write_binary_files(Gh, Gu, Gv, output_path)
-    # Create output directory if it doesn't exist
-    if !isdir(output_path)
-        mkpath(output_path)
-    end
-    
-    # List of files to write (using Vector{Tuple{String, Any}} to accommodate 2D and 3D arrays)
-    files_to_write = Tuple{String, Any}[
-        ("thickness.bin", Gh.h_clip),
-        ("surface.bin", Gh.s_clip),
-        ("bed.bin", Gh.b_clip),
-        ("h_mask.bin", Float64.(Gh.mask_clip)),
-        ("u_iszero.bin", Float64.(Gu.uiszero_clip)),
-        ("v_iszero.bin", Float64.(Gv.viszero_clip)),
-        ("basinID.bin", Gh.basinID_clip),
-        ("accumulation_data.bin", Gh.a_Arthern_clip),
-        ("dhdt_data.bin", Gh.dhdt_clip),
-        ("dhdt_acc_mask.bin", Float64.(Gh.dhdtAccDataMask_clip)),
-        ("udata.bin", Gu.uData_clip),
-        ("vdata.bin", Gv.vData_clip),
-        ("udata_mask.bin", Float64.(Gu.uDataMaskFull_clip)),
-        ("vdata_mask.bin", Float64.(Gv.vDataMaskFull_clip))
-    ]
-    
-    # Add temperature and sigma files if available
-    if haskey(Gh, :levels) && haskey(Gh.levels, :temperature_clip)
-        push!(files_to_write, ("temps.bin", Gh.levels.temperature_clip))
-    end
-    if haskey(Gh, :levels) && haskey(Gh.levels, :sigma_full)
-        push!(files_to_write, ("sigma_grid.bin", Gh.levels.sigma_full))
-    end
-    
-    for (filename, data) in files_to_write
-        filepath = joinpath(output_path, filename)
-        if !isfile(filepath)
-            open(filepath, "w") do io
-                write(io, Float64.(data))
-            end
-        end
-    end
 end
 
 end # module SetupData

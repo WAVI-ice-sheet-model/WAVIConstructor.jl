@@ -5,6 +5,7 @@ include("DataLoading.jl")
 include("ConstructorParams.jl")
 include("InitBedmachine.jl")
 include("DomainSelection.jl")
+include("OutputWriting.jl")
 include("SetupData.jl")
 
 # Re-export main functions from submodules
@@ -18,6 +19,7 @@ using .DataSources: DataSource, SourceConfig, default_path, NoData,
     BedMachineV3, ALBMAPv1, FrankTemps, BISICLESTemps,
     MEaSUREs, ArthernAccumulation, SmithDhdt, ZwallyBasins
 using .DataLoading: load_data, interpolate_to_grid, interpolate_temperature
+using .OutputWriting: write_output, write_binary_files, write_netcdf_file
 
 export init_bedmachine, select_domain_wavi, setup_wavi_data
 export ConstructorParams, default_constructor_params, minimal_constructor_params, to_dict
@@ -27,5 +29,6 @@ export AccumulationSource, DhDtSource, BasinSource
 export BedMachineV3, ALBMAPv1, FrankTemps, BISICLESTemps
 export MEaSUREs, ArthernAccumulation, SmithDhdt, ZwallyBasins
 export load_data, interpolate_to_grid, interpolate_temperature
+export write_output, write_binary_files, write_netcdf_file
 
 end # module

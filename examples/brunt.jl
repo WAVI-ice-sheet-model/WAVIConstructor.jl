@@ -56,7 +56,10 @@ params = default_constructor_params(
     density_ocean = 1028.0,
 
     # Minimum ice thickness (m) - thinner ice is masked out
-    min_thick = 50.0
+    min_thick = 50.0,
+
+    # Output format: :bin, :netcdf, or :both
+    output_format = :both
 )
 
 # Run WAVI Data Setup
@@ -64,7 +67,7 @@ params = default_constructor_params(
 # Execute the full workflow:
 # 1. init_bedmachine: Load and interpolate BedMachine data to target grid
 # 2. select_domain_wavi: Mask domain to selected basins, compute boundaries
-# 3. Write binary output files for WAVI model
+# 3. Write output files (NetCDF) for WAVI model
 Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/basin4_brunt_shelf")
 
 # Summary
