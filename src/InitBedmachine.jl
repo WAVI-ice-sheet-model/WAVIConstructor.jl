@@ -336,10 +336,6 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = vy[1:sub_samp:end, 1:sub_samp:end]
     end
 
-    # Nearest-neighbour interpolation onto the staggered U / V grids,
-    # matching MATLAB's TriScatteredInterp(…, 'nearest').
-    # NaN source values are included (as MATLAB does) so that target
-    # points whose nearest source is NaN also become NaN.
     u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy)
     v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy)
     
