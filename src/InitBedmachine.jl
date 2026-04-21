@@ -323,7 +323,7 @@ function load_velocity_data(Gu, Gv, Gh, params)
         vy = zeros(size(Gh.yy))
     end
 
-    # Apply subsampling if needed
+    # Apply subsampling
     if sub_samp < 1.0
         xx_v = xx_v[1:1:end, 1:1:end]
         yy_v = yy_v[1:1:end, 1:1:end]
