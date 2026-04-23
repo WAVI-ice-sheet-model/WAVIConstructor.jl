@@ -70,17 +70,19 @@ function WAVIConstructor.interpolate_temperature(::MyNewSource, data, Gh)
 end
 ```
 
-If your data is on a different grid, you need to interpolate it to the WAVI grid. Here is a concrete example using [Interpolations.jl](https://github.com/JuliaMath/Interpolations.jl):
+If your data is on a different grid, you need to interpolate it to the WAVI grid. Here is a concrete example using the approach from the codebase (see BISICLESTemps and FrankTemps in `src/DataLoading.jl`):
 
 ```julia
-using Interpolations
-
 function WAVIConstructor.interpolate_temperature(::MyNewSource, data, Gh)
-  # Assume data.temps is (nx, ny, nz), data.x, data.y, data.sigma are the coordinates
-  itp = interpolate((data.x, data.y, data.sigma), data.temps, Gridded(Linear()))
-  # Gh.x, Gh.y, Gh.sigma are the WAVI grid coordinates
-  temps_interp = [itp(x, y, s) for x in Gh.x, y in Gh.y, s in Gh.sigma]
-  return temps_interp
+  # Assume data.temps is (nz, ny, nx), data.x, data.y, data.sigma are the coordinates
+  temperature = zeros(size(data.temps, 1), Gh.nx, Gh.ny)
+  for i in 1:size(data.temps, 1)
+    # Interpolate each sigma level to the WAVI grid
+    temperature[i, :, :] = WAVIConstructor.interpolate_to_grid(
+      data.x[:], data.y[:], data.temps[i, :, :][:], Gh.xx, Gh.yy
+    )
+  end
+  return temperature, data.sigma
 end
 ```
 
