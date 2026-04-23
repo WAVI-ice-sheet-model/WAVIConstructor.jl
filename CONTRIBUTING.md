@@ -1,6 +1,6 @@
 # Contributing to WAVIConstructor.jl
 
-Thank you for your interest in contributing! This guide covers setting up a development environment, running tests and linters, adding new datasets, and the workflow for branches, pull requests, and releases.
+Thank you for your interest in contributing! This guide covers setting up a development environment, running tests, adding new datasets, and the workflow for branches, pull requests, and releases.
 
 ## Development Environment Setup
 
