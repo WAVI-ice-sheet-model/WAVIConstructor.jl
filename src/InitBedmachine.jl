@@ -9,7 +9,7 @@ using Interpolations
 using WAVI
 
 using WAVIConstructor.DataSources
-using WAVIConstructor.DataLoading: load_data, interpolate_to_grid, interpolate_temperature
+using WAVIConstructor.DataLoading: load_data, interpolate_to_grid, interpolate_regular_grid_nearest, interpolate_temperature
 
 """
     init_bedmachine(params)
@@ -151,10 +151,12 @@ function init_bedmachine(params)
     end
     
     # Add aliases for compatibility with SelectDomainWAVI
+    # Gh.rock must match MATLAB: (surfType==3) | (grounded & h < min_thick)
+    # NOT just rockmask (BedMachine mask==1), which omits thin grounded ice cells.
     Gh = merge(Gh, (
         basinID = Gh.basin_id,
         a = Gh.a_Arthern,
-        rock = Gh.rockmask
+        rock = Gh.rock   # already set above as (surfType==3)|(aground & h<min_thick)
     ))
 
     # Create U/V/C grids
@@ -311,46 +313,38 @@ function load_velocity_data(Gu, Gv, Gh, params)
     vel_data   = load_data(vel_source, vel_file)
 
     if vel_data !== nothing
-        xx_v = vel_data.xx
-        yy_v = vel_data.yy
         vx   = vel_data.vx
         vy   = vel_data.vy
+
+        # Subsampled 1-D coordinate axes and 2-D value arrays
+        step = sub_samp < 1.0 ? 1 : sub_samp
+        xs  = vel_data.x[1:step:end]
+        ys  = vel_data.y[1:step:end]
+        vx_sub = vx[1:step:end, 1:step:end]
+        vy_sub = vy[1:step:end, 1:step:end]
+
+        # Use regular-grid nearest-neighbour with MATLAB-style round-half-up
+        # tie-breaking (floor(f+0.5)) to replicate TriScatteredInterp behaviour.
+        u_data = interpolate_regular_grid_nearest(xs, ys, vx_sub, Gu.xx, Gu.yy)
+        v_data = interpolate_regular_grid_nearest(xs, ys, vy_sub, Gv.xx, Gv.yy)
     else
         @warn "Velocity data skipped (source: $(typeof(vel_source))). Using zeros."
-        xx_v = Gh.xx
-        yy_v = Gh.yy
-        vx = zeros(size(Gh.xx))
-        vy = zeros(size(Gh.yy))
+        u_data = zeros(size(Gu.xx))
+        v_data = zeros(size(Gv.xx))
     end
 
-    # Apply subsampling
-    if sub_samp < 1.0
-        xx_v = xx_v[1:1:end, 1:1:end]
-        yy_v = yy_v[1:1:end, 1:1:end]
-        vx = vx[1:1:end, 1:1:end]
-        vy = vy[1:1:end, 1:1:end]
-    else
-        xx_v = xx_v[1:sub_samp:end, 1:sub_samp:end]
-        yy_v = yy_v[1:sub_samp:end, 1:sub_samp:end]
-        vx = vx[1:sub_samp:end, 1:sub_samp:end]
-        vy = vy[1:sub_samp:end, 1:sub_samp:end]
-    end
-
-    u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy)
-    v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy)
-    
     Gu = merge(Gu, (
         u_data = u_data,
-        u_data_mask = .!isnan.(u_data),
-        uData = u_data,  # Alias for compatibility
-        uDataMask = .!isnan.(u_data)
+        u_data_mask = u_data .!= 0.0,
+        uData = u_data,
+        uDataMask = u_data .!= 0.0   # matches MATLAB: ~isnan(uData) where fill→NaN
     ))
 
     Gv = merge(Gv, (
         v_data = v_data,
-        v_data_mask = .!isnan.(v_data),
-        vData = v_data,  # Alias for compatibility
-        vDataMask = .!isnan.(v_data)
+        v_data_mask = v_data .!= 0.0,
+        vData = v_data,
+        vDataMask = v_data .!= 0.0
     ))
 
     return Gu, Gv

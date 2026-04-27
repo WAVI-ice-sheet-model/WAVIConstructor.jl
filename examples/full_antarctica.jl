@@ -84,7 +84,7 @@ params = default_constructor_params(
 println("Running full Antarctica setup (8 km, basins 1:27)...")
 println("This may take a while — loading and interpolating multiple datasets.\n")
 
-Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/full_antarctica")
+Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/full_antarctica", diagnostic_plots=true)
 
 # ──────────────────────────────────────────────────────────────────────
 # Summary

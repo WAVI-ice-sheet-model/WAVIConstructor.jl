@@ -9,7 +9,7 @@ import DelimitedFiles: readdlm
 
 using WAVIConstructor.DataSources
 
-export load_data, interpolate_to_grid, interpolate_temperature, geotiff_read_axis_only
+export load_data, interpolate_to_grid, interpolate_regular_grid_nearest, interpolate_temperature, geotiff_read_axis_only
 
 
 """
@@ -133,9 +133,12 @@ function load_data(::MEaSUREs, filename::String)
         VX_raw = Array(ds["VX"])
         VY_raw = Array(ds["VY"])
 
-        # Convert Union{Missing,Float32} → Float64 (missing → NaN)
-        VX = Float64[ismissing(v) ? NaN : Float64(v) for v in VX_raw]
-        VY = Float64[ismissing(v) ? NaN : Float64(v) for v in VY_raw]
+        # MEaSUREs uses _FillValue = 0.f for no-data pixels.
+        # NCDatasets converts those to `missing`; we convert to 0.0 to match
+        # MATLAB's raw float read. The mask is later derived as (uData != 0),
+        # which correctly excludes fill pixels regardless of their value.
+        VX = Float64[ismissing(v) ? 0.0 : Float64(v) for v in VX_raw]
+        VY = Float64[ismissing(v) ? 0.0 : Float64(v) for v in VY_raw]
 
         # Create coordinate grids (equivalent to MATLAB's ndgrid)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
@@ -458,33 +461,82 @@ function load_data(::FrankTemps, filename::String)
 end
 
 """
-    interpolate_to_grid(x, y, values, xi, yi)
+    interpolate_regular_grid_nearest(xs, ys, values, xi, yi)
 
-Interpolate scattered data to a regular grid using nearest neighbor interpolation.
-This is equivalent to MATLAB's TriScatteredInterp with 'nearest' method.
+Nearest-neighbour interpolation from a **regular** source grid onto arbitrary
+target points, using MATLAB-compatible round-half-up tie-breaking to match
+`TriScatteredInterp(...,'nearest')` behaviour.
 
-# Arguments
-- `x, y`: 1D arrays of scattered point coordinates
-- `values`: 1D array of values at scattered points
-- `xi, yi`: 2D arrays of target grid coordinates
+- `xs`, `ys`: 1-D uniformly-spaced source coordinate vectors (any order).
+- `values`: 2-D array of size `(length(xs), length(ys))`.
+- `xi`, `yi`: target coordinates (any shape).
 
-# Returns
-- 2D array of interpolated values on the target grid
+Target points outside the source bounding box receive `NaN`,
+matching MATLAB's convex-hull-extrapolation behaviour.
 """
-function interpolate_to_grid(x, y, values, xi, yi)
+function interpolate_regular_grid_nearest(xs::AbstractVector, ys::AbstractVector,
+                                           values::AbstractMatrix, xi, yi)
+    dx_s = xs[2] - xs[1]   # source spacing (signed)
+    dy_s = ys[2] - ys[1]
+    nx_s = length(xs)
+    ny_s = length(ys)
+
+    xi_flat = vec(xi)
+    yi_flat = vec(yi)
+    result_flat = Vector{Float64}(undef, length(xi_flat))
+
+    @inbounds for k in eachindex(xi_flat)
+        # Fractional 1-based index in source grid
+        fi = (xi_flat[k] - xs[1]) / dx_s + 1.0
+        fj = (yi_flat[k] - ys[1]) / dy_s + 1.0
+        # Outside convex hull → NaN (mirrors MATLAB TriScatteredInterp)
+        if fi < 0.5 || fi > nx_s + 0.5 || fj < 0.5 || fj > ny_s + 0.5
+            result_flat[k] = NaN
+        else
+            # MATLAB-style round-half-up: floor(f + 0.5) rather than
+            # Julia's banker's rounding which round-half-to-even.
+            i = clamp(floor(Int, fi + 0.5), 1, nx_s)
+            j = clamp(floor(Int, fj + 0.5), 1, ny_s)
+            result_flat[k] = values[i, j]
+        end
+    end
+
+    return reshape(result_flat, size(xi))
+end
+
+"""
+    interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
+
+Interpolate scattered data to a grid using nearest-neighbour search (KDTree).
+Equivalent to MATLAB's TriScatteredInterp / scatteredInterpolant with 'nearest'.
+
+- `max_dist`: target points farther than this from any source point receive `NaN`.
+"""
+function interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
     # Flatten target grid coordinates
     xi_flat = vec(xi)
     yi_flat = vec(yi)
-    
+
+    # Strip NaN source points — a NaN-valued source point must never be chosen
+    # as the nearest neighbour for a target that has valid data nearby.
+    valid = .!isnan.(values)
+    if !any(valid)
+        return fill(NaN, size(xi))
+    end
+    x_v      = x[valid]
+    y_v      = y[valid]
+    values_v = values[valid]
+
     # Build KDTree for efficient nearest neighbor search
-    points = hcat(x, y)
+    points = hcat(x_v, y_v)
     tree = KDTree(points')
     
-    # Find nearest neighbors for each target point
-    indices, _ = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
+    # Find nearest neighbors and distances for each target point
+    indices, dists = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
     
-    # Extract values at nearest neighbors
-    result_flat = [values[idx[1]] for idx in indices]
+    # Extract values at nearest neighbors; mask out points beyond max_dist
+    result_flat = [dists[i][1] <= max_dist ? values_v[indices[i][1]] : NaN
+                   for i in eachindex(indices)]
     
     # Reshape to match target grid
     return reshape(result_flat, size(xi))
