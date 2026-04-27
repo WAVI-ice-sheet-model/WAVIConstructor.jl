@@ -327,6 +327,10 @@ function load_velocity_data(Gu, Gv, Gh, params)
         # tie-breaking (floor(f+0.5)) to replicate TriScatteredInterp behaviour.
         u_data = interpolate_regular_grid_nearest(xs, ys, vx_sub, Gu.xx, Gu.yy)
         v_data = interpolate_regular_grid_nearest(xs, ys, vy_sub, Gv.xx, Gv.yy)
+        # Points outside the MEaSUREs bounding box get NaN.  Leave them as NaN
+        # here so that replace_nans_in_clipped_velocity can write -9999 for
+        # those cells, matching MATLAB's output.  The mask excludes both NaN
+        # and zero (MEaSUREs fill value).
     else
         @warn "Velocity data skipped (source: $(typeof(vel_source))). Using zeros."
         u_data = zeros(size(Gu.xx))
@@ -335,16 +339,16 @@ function load_velocity_data(Gu, Gv, Gh, params)
 
     Gu = merge(Gu, (
         u_data = u_data,
-        u_data_mask = u_data .!= 0.0,
+        u_data_mask = .!isnan.(u_data) .& (u_data .!= 0.0),
         uData = u_data,
-        uDataMask = u_data .!= 0.0   # matches MATLAB: ~isnan(uData) where fill→NaN
+        uDataMask = .!isnan.(u_data) .& (u_data .!= 0.0)
     ))
 
     Gv = merge(Gv, (
         v_data = v_data,
-        v_data_mask = v_data .!= 0.0,
+        v_data_mask = .!isnan.(v_data) .& (v_data .!= 0.0),
         vData = v_data,
-        vDataMask = v_data .!= 0.0
+        vDataMask = .!isnan.(v_data) .& (v_data .!= 0.0)
     ))
 
     return Gu, Gv

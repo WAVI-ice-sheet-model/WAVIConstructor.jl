@@ -214,11 +214,12 @@ function setup_wavi_data(params; output_path="outputs", edge=3, output_format=no
     ))
     
     # Create full velocity masks (both data and mask)
+    # MATLAB: uDataMask = (uData != 0) & Gu.mask  — velocity data AND ice mask
     Gu = merge(Gu, (
-        uDataMaskFull_clip = Gu.uDataMask_clip,
+        uDataMaskFull_clip = Gu.uDataMask_clip .& Gu.mask_clip,
     ))
     Gv = merge(Gv, (
-        vDataMaskFull_clip = Gv.vDataMask_clip,
+        vDataMaskFull_clip = Gv.vDataMask_clip .& Gv.mask_clip,
     ))
     
     # Extrapolate temperature to include surface (sigma=0) and base (sigma=1)
