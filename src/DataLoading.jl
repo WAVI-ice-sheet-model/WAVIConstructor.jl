@@ -4,11 +4,12 @@ using ArchGDAL
 using NCDatasets
 using MAT
 using NearestNeighbors
+using Interpolations
 import DelimitedFiles: readdlm
 
 using WAVIConstructor.DataSources
 
-export load_data, interpolate_to_grid, interpolate_temperature, geotiff_read_axis_only
+export load_data, interpolate_to_grid, interpolate_regular_grid_nearest, interpolate_temperature, geotiff_read_axis_only
 
 
 """
@@ -93,14 +94,16 @@ end
 
 
 """
-    load_data(::BISICLESTemps, filename::String; scale_xy::Real=1)
+    load_data(::BISICLESTemps, filename::String; scale_xy::Real=1000)
 
 Load temperature and coordinate data from a BISICLES NetCDF file.
+The default `scale_xy=1000` converts the file's km coordinates to metres,
+matching MATLAB's `bisicles_x = 1000 * ncread(fname_start, 'x')`.
 
 # Returns
 A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::FrankTemps, …)`.
 """
-function load_data(::BISICLESTemps, filename::String; scale_xy::Real=1)
+function load_data(::BISICLESTemps, filename::String; scale_xy::Real=1000)
     ds = NCDataset(filename)
     try
         bisicles_sigma = vec(Array(ds["sigma"]))
@@ -127,14 +130,22 @@ function load_data(::MEaSUREs, filename::String)
     try
         Measures_x = Array(ds["x"])
         Measures_y = Array(ds["y"])
-        VX = Array(ds["VX"])
-        VY = Array(ds["VY"])
-        
+        VX_raw = Array(ds["VX"])
+        VY_raw = Array(ds["VY"])
+
+        # MEaSUREs uses _FillValue = 0.f for no-data pixels.
+        # NCDatasets converts those to `missing`; we convert to 0.0 to match
+        # MATLAB's raw float read. The mask is later derived as (uData != 0),
+        # which correctly excludes fill pixels regardless of their value.
+        VX = Float64[ismissing(v) ? 0.0 : Float64(v) for v in VX_raw]
+        VY = Float64[ismissing(v) ? 0.0 : Float64(v) for v in VY_raw]
+
         # Create coordinate grids (equivalent to MATLAB's ndgrid)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
         yy_v = repeat(Measures_y', length(Measures_x), 1)
 
-        return (xx = xx_v, yy = yy_v, vx = VX, vy = VY)
+        return (xx = xx_v, yy = yy_v, vx = VX, vy = VY,
+                x = Measures_x, y = Measures_y)
     finally
         close(ds)
     end
@@ -450,33 +461,82 @@ function load_data(::FrankTemps, filename::String)
 end
 
 """
-    interpolate_to_grid(x, y, values, xi, yi)
+    interpolate_regular_grid_nearest(xs, ys, values, xi, yi)
 
-Interpolate scattered data to a regular grid using nearest neighbor interpolation.
-This is equivalent to MATLAB's TriScatteredInterp with 'nearest' method.
+Nearest-neighbour interpolation from a **regular** source grid onto arbitrary
+target points, using MATLAB-compatible round-half-up tie-breaking to match
+`TriScatteredInterp(...,'nearest')` behaviour.
 
-# Arguments
-- `x, y`: 1D arrays of scattered point coordinates
-- `values`: 1D array of values at scattered points
-- `xi, yi`: 2D arrays of target grid coordinates
+- `xs`, `ys`: 1-D uniformly-spaced source coordinate vectors (any order).
+- `values`: 2-D array of size `(length(xs), length(ys))`.
+- `xi`, `yi`: target coordinates (any shape).
 
-# Returns
-- 2D array of interpolated values on the target grid
+Target points outside the source bounding box receive `NaN`,
+matching MATLAB's convex-hull-extrapolation behaviour.
 """
-function interpolate_to_grid(x, y, values, xi, yi)
+function interpolate_regular_grid_nearest(xs::AbstractVector, ys::AbstractVector,
+                                           values::AbstractMatrix, xi, yi)
+    dx_s = xs[2] - xs[1]   # source spacing (signed)
+    dy_s = ys[2] - ys[1]
+    nx_s = length(xs)
+    ny_s = length(ys)
+
+    xi_flat = vec(xi)
+    yi_flat = vec(yi)
+    result_flat = Vector{Float64}(undef, length(xi_flat))
+
+    @inbounds for k in eachindex(xi_flat)
+        # Fractional 1-based index in source grid
+        fi = (xi_flat[k] - xs[1]) / dx_s + 1.0
+        fj = (yi_flat[k] - ys[1]) / dy_s + 1.0
+        # Outside convex hull → NaN (mirrors MATLAB TriScatteredInterp)
+        if fi < 0.5 || fi > nx_s + 0.5 || fj < 0.5 || fj > ny_s + 0.5
+            result_flat[k] = NaN
+        else
+            # MATLAB-style round-half-up: floor(f + 0.5) rather than
+            # Julia's banker's rounding which round-half-to-even.
+            i = clamp(floor(Int, fi + 0.5), 1, nx_s)
+            j = clamp(floor(Int, fj + 0.5), 1, ny_s)
+            result_flat[k] = values[i, j]
+        end
+    end
+
+    return reshape(result_flat, size(xi))
+end
+
+"""
+    interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
+
+Interpolate scattered data to a grid using nearest-neighbour search (KDTree).
+Equivalent to MATLAB's TriScatteredInterp / scatteredInterpolant with 'nearest'.
+
+- `max_dist`: target points farther than this from any source point receive `NaN`.
+"""
+function interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
     # Flatten target grid coordinates
     xi_flat = vec(xi)
     yi_flat = vec(yi)
-    
+
+    # Strip NaN source points — a NaN-valued source point must never be chosen
+    # as the nearest neighbour for a target that has valid data nearby.
+    valid = .!isnan.(values)
+    if !any(valid)
+        return fill(NaN, size(xi))
+    end
+    x_v      = x[valid]
+    y_v      = y[valid]
+    values_v = values[valid]
+
     # Build KDTree for efficient nearest neighbor search
-    points = hcat(x, y)
+    points = hcat(x_v, y_v)
     tree = KDTree(points')
     
-    # Find nearest neighbors for each target point
-    indices, _ = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
+    # Find nearest neighbors and distances for each target point
+    indices, dists = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
     
-    # Extract values at nearest neighbors
-    result_flat = [values[idx[1]] for idx in indices]
+    # Extract values at nearest neighbors; mask out points beyond max_dist
+    result_flat = [dists[i][1] <= max_dist ? values_v[indices[i][1]] : NaN
+                   for i in eachindex(indices)]
     
     # Reshape to match target grid
     return reshape(result_flat, size(xi))
@@ -524,27 +584,76 @@ end
 BISICLES stores `(sigma_levels, ny, nx)` with 1-D coordinate vectors.
 Values above 273.148 K are treated as invalid ocean fill and masked
 before interpolation.
+
+Uses gridded linear interpolation with nearest-neighbor extrapolation
+to match MATLAB's `scatteredInterpolant(..., 'linear', 'nearest')`.
+
+Matches MATLAB's cumulative ocean masking: once a spatial point is
+identified as ocean (>273.148 K) at any sigma level, it is NaN'd
+for all subsequent levels too.
 """
 function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
     temps_raw = copy(temp_data.temps)       # copy so we can NaN-mask in place
     sigmas    = temp_data.sigma
 
-    bisicles_yy = repeat(temp_data.yy, 1, length(temp_data.xx))
-    bisicles_xx = repeat(temp_data.xx', length(temp_data.yy), 1)
+    bisicles_x = temp_data.xx
+    bisicles_y = temp_data.yy
+
+    bisicles_yy = repeat(bisicles_y, 1, length(bisicles_x))
+    bisicles_xx = repeat(bisicles_x', length(bisicles_y), 1)
 
     temperature = zeros(length(sigmas), Gh.nx, Gh.ny)
 
+    # Cumulative ocean mask across all sigma levels (matching MATLAB)
+    # MATLAB: bisicles_mask_full accumulates, then NaNs the ENTIRE 3D array
+    ny_b, nx_b = size(bisicles_xx)
+    cumulative_mask = falses(length(sigmas), ny_b, nx_b)
+
     for i in 1:length(sigmas)
-        ocean_mask = temps_raw[i, :, :] .> 273.1480
-        temps_raw[i, ocean_mask] .= NaN
+        # Identify ocean at this level
+        ocean_mask_2d = temps_raw[i, :, :] .> 273.1480
+        cumulative_mask[i, :, :] .= ocean_mask_2d
+
+        # Apply cumulative mask to entire 3D array (matches MATLAB)
+        temps_raw[cumulative_mask] .= NaN
 
         this_temp  = temps_raw[i, :, :]
         valid_mask = .!isnan.(this_temp)
+
         xx_valid   = bisicles_xx[valid_mask]
         yy_valid   = bisicles_yy[valid_mask]
         temp_valid = this_temp[valid_mask]
 
-        temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
+        if length(temp_valid) == 0
+            @warn "No valid temperature data at sigma level $i"
+            continue
+        end
+
+        # Use gridded linear interpolation with nearest-neighbor extrapolation
+        # to match MATLAB's scatteredInterpolant(..., 'linear', 'nearest').
+        # Since BISICLES is on a regular grid, we fill NaN holes first with
+        # nearest-neighbor, then do bilinear interpolation.
+        try
+            filled_temp = copy(this_temp)
+            if any(.!valid_mask)
+                tree = KDTree(hcat(xx_valid, yy_valid)')
+                nan_xx = bisicles_xx[.!valid_mask]
+                nan_yy = bisicles_yy[.!valid_mask]
+                idxs, _ = knn(tree, hcat(nan_xx, nan_yy)', 1, true)
+                filled_temp[.!valid_mask] .= [temp_valid[idx[1]] for idx in idxs]
+            end
+
+            # Build gridded linear interpolation on the regular BISICLES grid
+            itp = LinearInterpolation((bisicles_y, bisicles_x), filled_temp;
+                                      extrapolation_bc=Flat())
+            for ix in 1:Gh.nx, iy in 1:Gh.ny
+                temperature[i, ix, iy] = itp(Gh.yy[ix, iy], Gh.xx[ix, iy])
+            end
+        catch e
+            # Fall back to KDTree nearest-neighbor if gridded interpolation fails
+            @warn "BISICLES gridded interpolation failed at level $i, falling back to nearest-neighbor" exception=e
+            temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
+        end
     end
     return temperature, sigmas
 end
