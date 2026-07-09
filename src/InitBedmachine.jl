@@ -7,6 +7,7 @@ using NCDatasets
 using ArchGDAL
 using Interpolations
 using WAVI
+using ProgressMeter
 
 using WAVIConstructor.DataSources
 using WAVIConstructor.DataLoading: load_data, interpolate_to_grid, interpolate_temperature
@@ -24,10 +25,17 @@ Julia port of the MATLAB initBedmachineV3 function.
 Tuple of grid structures (Gh, Gu, Gv, Gc) with loaded data
 """
 function init_bedmachine(params)
+    # ── Progress bar: 10 steps covering all major I/O and interpolation ──
+    n_steps = 10
+    prog = Progress(n_steps; desc="Initialising BedMachine: ", showspeed=true,
+                    barglyphs=BarGlyphs("[=> ]"), color=:cyan)
+
+    # Step 1 ─ Load BedMachine
     bed_source = get(params, :bed_source, BedMachineV3())
     bed_file   = get(params, :bed_file, default_path(BedMachineV3()))
 
     bm = load_data(bed_source, bed_file)
+    next!(prog; showvalues = [("Step", "Loading BedMachine data")])
     bed       = bm.bed
     x         = bm.x
     y         = bm.y
@@ -85,9 +93,12 @@ function init_bedmachine(params)
     x = x_full[isub]
     y = y_full[jsub]
 
-    # Create H-grid structure
+    # Step 2 ─ Create H-grid structure
     Gh = create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
-    Gh = load_additional_datasets(Gh, params)
+    next!(prog; showvalues = [("Step", "Building H-grid")])
+
+    # Steps 3-5 ─ Load additional datasets (accumulation, basins, surface temp)
+    Gh = load_additional_datasets(Gh, params, prog)
     
     # Calculate height above floatation and grounded ice mask
     density_ice = get(params, :density_ice, 918.0)
@@ -114,8 +125,9 @@ function init_bedmachine(params)
         rock = (Gh.surfType .== 3) .| (Gh.aground .& (Gh.h .< min_thick)),
         ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2))
     ))
+    next!(prog; showvalues = [("Step", "Computing surface types & grounding")])
     
-    # Load dhdt data via dispatch
+    # Step 7 ─ Load dhdt data via dispatch
     dhdt_source = get(params, :dhdt_source, SmithDhdt())
     dhdt_file   = get(params, :dhdt_file, default_path(SmithDhdt()))
     smith_data  = load_data(dhdt_source, dhdt_file)
@@ -156,15 +168,23 @@ function init_bedmachine(params)
         a = Gh.a_Arthern,
         rock = Gh.rockmask
     ))
+    next!(prog; showvalues = [("Step", "Loading dh/dt data")])
 
-    # Create U/V/C grids
+    # Step 8 ─ Create U/V/C grids
     Gu = create_u_grid(Gh)
     Gv = create_v_grid(Gh)
     Gc = create_c_grid(Gh)
+    next!(prog; showvalues = [("Step", "Building U/V/C grids")])
 
+    # Step 9 ─ Load velocity data
     Gu, Gv = load_velocity_data(Gu, Gv, Gh, params)
-    Gh = load_temperature_data(Gh, params)
+    next!(prog; showvalues = [("Step", "Loading velocity data")])
 
+    # Step 10 ─ Load temperature data
+    Gh = load_temperature_data(Gh, params)
+    next!(prog; showvalues = [("Step", "Loading temperature data")])
+
+    finish!(prog)
     return Gh, Gu, Gv, Gc
 end
 
@@ -198,12 +218,13 @@ function create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
 end
 
 """
-    load_additional_datasets(Gh, params)
+    load_additional_datasets(Gh, params, prog)
 
 Load accumulation, basin, and surface temperature data via dispatch on source types.
+Advances `prog` once per dataset loaded (3 steps).
 """
-function load_additional_datasets(Gh, params)
-    # ── Accumulation ──────────────────────────────────────────────────
+function load_additional_datasets(Gh, params, prog)
+    # ── Step 3 ─ Accumulation ─────────────────────────────────────────
     acc_source = get(params, :accumulation_source, ArthernAccumulation())
     acc_file   = get(params, :accumulation_file, default_path(ArthernAccumulation()))
     acc_data   = load_data(acc_source, acc_file)
@@ -214,8 +235,9 @@ function load_additional_datasets(Gh, params)
         @warn "Accumulation data skipped (source: $(typeof(acc_source))). Using zeros."
         Gh = merge(Gh, (a_Arthern = zeros(size(Gh.xx)),))
     end
+    next!(prog; showvalues = [("Step", "Loading accumulation data")])
 
-    # ── Drainage basins ───────────────────────────────────────────────
+    # ── Step 4 ─ Drainage basins ──────────────────────────────────────
     basins_source = get(params, :basins_source, ZwallyBasins())
     basins_file   = get(params, :basins_file, default_path(ZwallyBasins()))
     basins_data   = load_data(basins_source, basins_file)
@@ -226,8 +248,9 @@ function load_additional_datasets(Gh, params)
         @warn "Basin data skipped (source: $(typeof(basins_source))). Using zeros."
         Gh = merge(Gh, (basin_id = zeros(size(Gh.xx)),))
     end
+    next!(prog; showvalues = [("Step", "Loading drainage basins")])
 
-    # ── Surface temperature / mean-annual temperature (ALBMAP) ────────
+    # ── Step 5 ─ Surface temperature / mean-annual temperature (ALBMAP)
     geom_source = get(params, :surface_temp_source, ALBMAPv1())
     geom_file   = get(params, :surface_temp_file, default_path(ALBMAPv1()))
 
@@ -237,6 +260,7 @@ function load_additional_datasets(Gh, params)
 
     geom_data = load_data(geom_source, geom_file)
     Gh = merge(Gh, (Tma = interpolate_to_grid(geom_data.xx[:], geom_data.yy[:], geom_data.Tma[:], Gh.xx, Gh.yy),))
+    next!(prog; showvalues = [("Step", "Loading surface temperature")])
 
     return Gh
 end
