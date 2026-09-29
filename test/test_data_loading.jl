@@ -10,7 +10,7 @@ using Test
 function create_mock_geotiff(tmpdir, filename, width, height, dx, dy, mapx, mapy, data)
     filepath = joinpath(tmpdir, filename)
     driver = ArchGDAL.getdriver("GTiff")
-    ArchGDAL.create(filepath; driver=driver, width=width, height=height, nbands=1, dtype=Float32) do dataset
+    ArchGDAL.create(filepath; driver = driver, width = width, height = height, nbands = 1, dtype = Float32) do dataset
         ArchGDAL.setgeotransform!(dataset, [mapx, dx, 0.0, mapy, 0.0, dy])
         ArchGDAL.write!(ArchGDAL.getband(dataset, 1), data)
     end
@@ -54,7 +54,7 @@ end
     # Test load_data(ArthernAccumulation(), ...)
     mktempdir() do tmpdir
         mockfile = joinpath(tmpdir, "mock_amsr_accumulation_map.txt")
-        
+
         open(mockfile, "w") do f
             # Write 21 header lines (realistic header format)
             println(f, "# Arthern, R. J., D. P. Winebrenner, and D. G. Vaughan (2006)")
@@ -76,7 +76,7 @@ end
             for i in 17:21
                 println(f, "# Header line $i")
             end
-            
+
             # Write realistic data with Antarctic coordinates
             # Realistic accumulation values: 100-1500 kg/m²/a (water equivalent)
             # Realistic error: 15-25%
@@ -97,7 +97,7 @@ end
                 (-76.0, 330.0, -800000.0, -500000.0, 1050.0, 23.0),    # Valid
                 (-88.0, 180.0, 100000.0, -100000.0, 50.0, 25.0),       # Valid - very low (interior)
             ]
-            
+
             for (lat, lon, x, y, acc, err) in test_data
                 println(f, "$lat $lon $x $y $acc $err")
             end
@@ -110,10 +110,10 @@ end
         @test length(acc_data.y) == 9
         @test length(acc_data.acc) == 9
         @test length(acc_data.x) == length(acc_data.y) == length(acc_data.acc)
-        
+
         # No NaN values in filtered output
         @test !any(isnan.(acc_data.acc))
-        
+
         # Accumulation converted from water equivalent to ice equivalent (divided by 917)
         # Original values: 450, 180, 850, 1200, 350, 680, 520, 1050, 50
         # Min ice equivalent: 50/917 ≈ 0.055
@@ -121,7 +121,7 @@ end
         @test all(acc_data.acc .> 0)
         @test minimum(acc_data.acc) > 0.05
         @test maximum(acc_data.acc) < 1.5
-        
+
         # Verify coordinate ranges are realistic (Antarctic polar stereographic)
         @test all(abs.(acc_data.x) .< 3000000)  # Reasonable polar stereographic range
         @test all(abs.(acc_data.y) .< 3000000)
@@ -147,10 +147,10 @@ end
         vy[:] .= collect(1.0f0:ny)
         vz[:] .= collect(1.0f0:nz)
         vsigma[:] .= collect(0.1f0:0.1f0:0.2f0)
-        vtemp[:, :, :] .= reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
+        vtemp[:, :, :] .= reshape(collect(1.0f0:(nx * ny * nz)), nz, ny, nx)
         close(ds)
 
-        data = load_data(BISICLESTemps(), mockfile, scale_xy=1000)
+        data = load_data(BISICLESTemps(), mockfile, scale_xy = 1000)
 
         @test size(data.sigma) == (nz,)
         @test size(data.xx) == (nx,)
@@ -159,7 +159,7 @@ end
         @test all(data.xx .== 1000 .* collect(1.0f0:nx))
         @test all(data.yy .== 1000 .* collect(1.0f0:ny))
         @test all(data.sigma .== collect(0.1f0:0.1f0:0.2f0))
-        expected_temps = reshape(collect(1.0f0:(nx*ny*nz)), nz, ny, nx)
+        expected_temps = reshape(collect(1.0f0:(nx * ny * nz)), nz, ny, nx)
         @test all(data.temps .== expected_temps)
     end
 
@@ -167,12 +167,13 @@ end
     mktempdir() do tmpdir
         nlevels = 3
         npoints = 10
-        FranksTemps = reshape(collect(200.0:1.0:(200.0 + nlevels*npoints - 1)), nlevels, npoints)
-        xxTemp = collect(-3000000.0:100000.0:(-3000000.0 + (npoints-1)*100000.0))
-        yyTemp = collect(-3000000.0:100000.0:(-3000000.0 + (npoints-1)*100000.0))
+        FranksTemps = reshape(collect(200.0:1.0:(200.0 + nlevels * npoints - 1)), nlevels, npoints)
+        xxTemp = collect(-3000000.0:100000.0:(-3000000.0 + (npoints - 1) * 100000.0))
+        yyTemp = collect(-3000000.0:100000.0:(-3000000.0 + (npoints - 1) * 100000.0))
         sigmaTemp = collect(0.1:0.1:0.3)
-        
-        mockfile = create_mock_matfile(tmpdir, "mock_FranksTemps.mat",
+
+        mockfile = create_mock_matfile(
+            tmpdir, "mock_FranksTemps.mat",
             [("FranksTemps", FranksTemps), ("xxTemp", xxTemp), ("yyTemp", yyTemp), ("sigmaTemp", sigmaTemp)]
         )
 
@@ -203,8 +204,8 @@ end
         vVY = defVar(ds, "VY", Float32, ("x", "y"))
         vx[:] .= collect(1.0f0:nx)
         vy[:] .= collect(1.0f0:ny)
-        vVX[:, :] .= reshape(collect(1.0f0:(nx*ny)), nx, ny)
-        vVY[:, :] .= reshape(collect(1.0f0:(nx*ny)), nx, ny)
+        vVX[:, :] .= reshape(collect(1.0f0:(nx * ny)), nx, ny)
+        vVY[:, :] .= reshape(collect(1.0f0:(nx * ny)), nx, ny)
         close(ds)
 
         data = load_data(MEaSUREs(), mockfile)
@@ -215,8 +216,8 @@ end
         @test size(data.vy) == (nx, ny)
         @test all(data.xx .== repeat(collect(1.0f0:nx), 1, ny))
         @test all(data.yy .== repeat(collect(1.0f0:ny)', nx, 1))
-        @test all(data.vx .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
-        @test all(data.vy .== reshape(collect(1.0f0:(nx*ny)), nx, ny))
+        @test all(data.vx .== reshape(collect(1.0f0:(nx * ny)), nx, ny))
+        @test all(data.vy .== reshape(collect(1.0f0:(nx * ny)), nx, ny))
     end
 
     # Test load_data(SmithDhdt(), ...)
@@ -226,27 +227,31 @@ end
         mapx, mapy = 100.0, 200.0
         mock_dhdt = Float32[1.5 2.5 3.5 4.5; -1.0 0.0 1.0 2.0; -2.5 -1.5 -0.5 0.5]
 
-        grnd_file = create_mock_geotiff(tmpdir, "mock_smith_grnd.tif", width, height, dx, dy, mapx, mapy,
-            permutedims(mock_dhdt, (2, 1)))
-        flt_file = create_mock_geotiff(tmpdir, "mock_smith_flt.tif", width, height, dx, dy, mapx, mapy,
-            permutedims(mock_dhdt .* 0.5, (2, 1)))
+        grnd_file = create_mock_geotiff(
+            tmpdir, "mock_smith_grnd.tif", width, height, dx, dy, mapx, mapy,
+            permutedims(mock_dhdt, (2, 1))
+        )
+        flt_file = create_mock_geotiff(
+            tmpdir, "mock_smith_flt.tif", width, height, dx, dy, mapx, mapy,
+            permutedims(mock_dhdt .* 0.5, (2, 1))
+        )
 
-        result = load_data(SmithDhdt(), "", grnd_file=grnd_file, flt_file=flt_file)
-        
+        result = load_data(SmithDhdt(), "", grnd_file = grnd_file, flt_file = flt_file)
+
         # The function flips data with reverse(dhdt, dims=1), so expected data should be flipped
-        expected_grnd = reverse(mock_dhdt, dims=1)
-        expected_flt = reverse(mock_dhdt .* 0.5, dims=1)
-        
+        expected_grnd = reverse(mock_dhdt, dims = 1)
+        expected_flt = reverse(mock_dhdt .* 0.5, dims = 1)
+
         # Test grounded data
         @test size(result.grnd_xx) == (height, width)
-        @test size(result.grnd_yy) == (height, width) 
+        @test size(result.grnd_yy) == (height, width)
         @test size(result.grnd_dhdt) == (height, width)
         expected_x = [mapx + dx * (i - 0.5) for i in 1:width]
         expected_y = [mapy - abs(dy) * (i - 0.5) for i in 1:height]
         @test all(result.grnd_xx[1, :] .≈ expected_x)
         @test all(result.grnd_yy[:, 1] .≈ reverse(expected_y))
         @test all(result.grnd_dhdt .≈ expected_grnd)
-        
+
         # Test floating data
         @test size(result.flt_xx) == (height, width)
         @test size(result.flt_yy) == (height, width)
@@ -259,24 +264,24 @@ end
         # Create a more realistic mock: 20x20 grid with realistic Antarctic coordinates
         # and realistic basin IDs (1-27 range) with contiguous regions
         nx, ny = 20, 20
-        
+
         # Antarctic polar stereographic coordinates (approx range)
-        x_coords = collect(range(-2500000.0, 500000.0, length=nx))
-        y_coords = collect(range(-2500000.0, 500000.0, length=ny))
-        
+        x_coords = collect(range(-2500000.0, 500000.0, length = nx))
+        y_coords = collect(range(-2500000.0, 500000.0, length = ny))
+
         xx_zwally_full = repeat(x_coords, 1, ny)
         yy_zwally_full = repeat(y_coords', nx, 1)
-        
+
         # Create basin IDs with contiguous regions (realistic spatial clustering)
         # Basin IDs should be 0 (ocean/ice-free) or 1-27
         zwally_basins_full = zeros(Int, nx, ny)
-        
+
         # Create 9 basin regions (3x3 quadrants) with basin IDs 1-9
         # Add some zeros around edges (ocean/ice-free areas)
         for i in 1:nx
             for j in 1:ny
                 # Set edges to 0 (ocean)
-                if i <= 2 || i >= nx-1 || j <= 2 || j >= ny-1
+                if i <= 2 || i >= nx - 1 || j <= 2 || j >= ny - 1
                     zwally_basins_full[i, j] = 0
                 else
                     # Divide interior into 9 regions with basin IDs 1-9
@@ -286,13 +291,14 @@ end
                 end
             end
         end
-        
+
         # Convert to Float64 to match actual file format
         xx_zwally_full = Float64.(xx_zwally_full)
         yy_zwally_full = Float64.(yy_zwally_full)
         zwally_basins_full = Float64.(zwally_basins_full)
-        
-        mockfile = create_mock_matfile(tmpdir, "mock_ZwallyBasins.mat",
+
+        mockfile = create_mock_matfile(
+            tmpdir, "mock_ZwallyBasins.mat",
             [("xxZwallyBasins", xx_zwally_full), ("yyZwallyBasins", yy_zwally_full), ("ZwallyBasins", zwally_basins_full)]
         )
 
@@ -300,7 +306,7 @@ end
 
         # Count expected valid points (basin > 0)
         expected_count = count(x -> x > 0, zwally_basins_full)
-        
+
         @test length(data.xx) == expected_count
         @test length(data.yy) == expected_count
         @test length(data.basins) == expected_count
@@ -308,7 +314,7 @@ end
         @test all(data.basins .> 0)
         @test minimum(data.basins) >= 1
         @test maximum(data.basins) <= 27
-        
+
         # Verify coordinate ranges are realistic (Antarctic extent)
         @test minimum(data.xx) >= -3000000.0
         @test maximum(data.xx) <= 3000000.0
@@ -322,8 +328,10 @@ end
         dx, dy = 10.0, -10.0
         mapx, mapy = 100.0, 200.0
 
-        mockfile = create_mock_geotiff(tmpdir, "mock_geotiff.tif", width, height, dx, dy, mapx, mapy,
-            ones(Float32, width, height))
+        mockfile = create_mock_geotiff(
+            tmpdir, "mock_geotiff.tif", width, height, dx, dy, mapx, mapy,
+            ones(Float32, width, height)
+        )
 
         result = geotiff_read_axis_only(mockfile)
 
@@ -342,62 +350,62 @@ end
 
 # Integration tests with real data files (skipped if files not present)
 @testset "Integration: Real Data Files" begin
-    
+
     # Test loading actual Arthern accumulation file
     arthern_file = "Data/amsr_accumulation_map.txt"
     if isfile(arthern_file)
         @testset "Real Arthern Accumulation File" begin
             acc_data = load_data(ArthernAccumulation(), arthern_file)
-            
+
             # File should contain valid data points
             @test length(acc_data.x) > 0
             @test length(acc_data.x) == length(acc_data.y) == length(acc_data.acc)
-            
+
             # No NaN values in filtered output
             @test !any(isnan.(acc_data.acc))
             @test !any(isnan.(acc_data.x))
-            
+
             # X and Y should be in reasonable polar stereographic range (within ~3000 km of pole)
             @test all(abs.(acc_data.x) .< 3500000)
             @test all(abs.(acc_data.y) .< 3500000)
-            
+
             # Accumulation (ice equivalent) should be positive and reasonable
             # Original water equiv is ~50-2000 kg/m²/a, so ice equiv is ~0.05-2.2 m/a
             @test all(acc_data.acc .> 0)
             @test minimum(acc_data.acc) > 0.01  # At least 10 mm/a
             @test maximum(acc_data.acc) < 5.0   # Less than 5 m/a
-            
+
             @info "Loaded $(length(acc_data.acc)) valid accumulation data points from real file"
         end
     else
         @warn "Skipping Arthern accumulation integration test: file not found at $arthern_file"
     end
-    
+
     # Test loading actual Zwally basins file
     zwally_file = "Data/ZwallyBasins.mat"
     if isfile(zwally_file)
         @testset "Real Zwally Basins File" begin
             data = load_data(ZwallyBasins(), zwally_file)
-            
+
             # File should contain valid data points
             @test length(data.xx) > 0
             @test length(data.xx) == length(data.yy) == length(data.basins)
-            
+
             # All basin IDs should be positive (filtered out zeros)
             @test all(data.basins .> 0)
-            
+
             # Basin IDs should be in valid range (1-27 for Zwally drainage basins)
             @test minimum(data.basins) >= 1
             @test maximum(data.basins) <= 27
-            
+
             # Coordinates should be in reasonable polar stereographic range
             @test all(abs.(data.xx) .< 4000000)
             @test all(abs.(data.yy) .< 4000000)
-            
+
             # Check that multiple basins are represented
             unique_basins = unique(data.basins)
             @test length(unique_basins) > 1  # Should have more than 1 basin
-            
+
             @info "Loaded $(length(data.basins)) valid basin data points from real file"
             @info "Unique basin IDs: $(sort(unique(data.basins)))"
         end
@@ -405,4 +413,3 @@ end
         @warn "Skipping Zwally basins integration test: file not found at $zwally_file"
     end
 end
-

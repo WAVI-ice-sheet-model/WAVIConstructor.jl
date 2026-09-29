@@ -68,7 +68,7 @@ params = default_constructor_params(
 # 1. init_bedmachine: Load and interpolate BedMachine data to target grid
 # 2. select_domain_wavi: Mask domain to selected basins, compute boundaries
 # 3. Write output files (NetCDF) for WAVI model
-Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/basin4_brunt_shelf")
+Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path = "outputs/basin4_brunt_shelf")
 
 # Summary
 println("Grid Configuration:")

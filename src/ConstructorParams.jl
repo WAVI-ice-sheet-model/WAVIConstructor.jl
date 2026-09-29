@@ -49,13 +49,13 @@ Use `NoData()` for optional categories you want to skip.
 """
 Base.@kwdef struct ConstructorParams
     # ── Data sources (SourceConfig per category) ─────────────────────
-    bed::SourceConfig{<:Union{BedSource,NoData}}              = SourceConfig(BedMachineV3())
-    surface_temp::SourceConfig{<:Union{SurfaceTempSource,NoData}}    = SourceConfig(ALBMAPv1())
-    temperature::SourceConfig{<:Union{TemperatureSource,NoData}} = SourceConfig(FrankTemps())
-    velocity::SourceConfig{<:Union{VelocitySource,NoData}}    = SourceConfig(MEaSUREs())
-    accumulation::SourceConfig{<:Union{AccumulationSource,NoData}} = SourceConfig(ArthernAccumulation())
-    dhdt::SourceConfig{<:Union{DhDtSource,NoData}}            = SourceConfig(SmithDhdt())
-    basins::SourceConfig{<:Union{BasinSource,NoData}}         = SourceConfig(ZwallyBasins())
+    bed::SourceConfig{<:Union{BedSource, NoData}} = SourceConfig(BedMachineV3())
+    surface_temp::SourceConfig{<:Union{SurfaceTempSource, NoData}} = SourceConfig(ALBMAPv1())
+    temperature::SourceConfig{<:Union{TemperatureSource, NoData}} = SourceConfig(FrankTemps())
+    velocity::SourceConfig{<:Union{VelocitySource, NoData}} = SourceConfig(MEaSUREs())
+    accumulation::SourceConfig{<:Union{AccumulationSource, NoData}} = SourceConfig(ArthernAccumulation())
+    dhdt::SourceConfig{<:Union{DhDtSource, NoData}} = SourceConfig(SmithDhdt())
+    basins::SourceConfig{<:Union{BasinSource, NoData}} = SourceConfig(ZwallyBasins())
 
     # ── Grid parameters ──────────────────────────────────────────────
     dx::Float64 = 10000.0
@@ -96,31 +96,31 @@ Gh, Gu, Gv, Gc = setup_wavi_data(d)
 function to_dict(params::ConstructorParams)
     return Dict{Symbol, Any}(
         # Data sources (source singleton + path)
-        :bed_source          => params.bed.source,
-        :bed_file            => params.bed.path,
-        :surface_temp_source  => params.surface_temp.source,
-        :surface_temp_file    => params.surface_temp.path,
-        :temperature_source  => params.temperature.source,
-        :temperature_file    => params.temperature.path,
-        :velocity_source     => params.velocity.source,
-        :velocity_file       => params.velocity.path,
+        :bed_source => params.bed.source,
+        :bed_file => params.bed.path,
+        :surface_temp_source => params.surface_temp.source,
+        :surface_temp_file => params.surface_temp.path,
+        :temperature_source => params.temperature.source,
+        :temperature_file => params.temperature.path,
+        :velocity_source => params.velocity.source,
+        :velocity_file => params.velocity.path,
         :accumulation_source => params.accumulation.source,
-        :accumulation_file   => params.accumulation.path,
-        :dhdt_source         => params.dhdt.source,
-        :dhdt_file           => params.dhdt.path,
-        :basins_source       => params.basins.source,
-        :basins_file         => params.basins.path,
+        :accumulation_file => params.accumulation.path,
+        :dhdt_source => params.dhdt.source,
+        :dhdt_file => params.dhdt.path,
+        :basins_source => params.basins.source,
+        :basins_file => params.basins.path,
 
         # Scalar / non-source fields
-        :dx              => params.dx,
-        :basins          => params.basin_ids,
-        :output_path     => params.output_path,
-        :output_format   => params.output_format,
+        :dx => params.dx,
+        :basins => params.basin_ids,
+        :output_path => params.output_path,
+        :output_format => params.output_format,
         :clip_edge_padding => params.clip_edge_padding,
-        :density_ice     => params.density_ice,
-        :density_ocean   => params.density_ocean,
-        :min_thick       => params.min_thick,
-        :sub_samp        => params.sub_samp,
+        :density_ice => params.density_ice,
+        :density_ocean => params.density_ocean,
+        :min_thick => params.min_thick,
+        :sub_samp => params.sub_samp,
     )
 end
 
@@ -138,7 +138,7 @@ Normalise any accepted shorthand into a `SourceConfig`:
 - tuple `(BedMachineV3(), "path")`    → `SourceConfig(BedMachineV3(), "path")`
 """
 _as_source_config(sc::SourceConfig) = sc
-_as_source_config(s::DataSource)    = SourceConfig(s)
+_as_source_config(s::DataSource) = SourceConfig(s)
 _as_source_config(t::Tuple{<:DataSource, <:AbstractString}) = SourceConfig(t[1], t[2])
 
 function _wrap_source_kwargs(kwargs)
@@ -197,10 +197,10 @@ Gh, Gu, Gv, Gc = setup_wavi_data(params)
 """
 function minimal_constructor_params(; kwargs...)
     defaults = Dict{Symbol, Any}(
-        :dx          => 32000.0,
-        :basin_ids   => 0:27,
-        :dhdt        => NoData(),
-        :velocity    => NoData(),
+        :dx => 32000.0,
+        :basin_ids => 0:27,
+        :dhdt => NoData(),
+        :velocity => NoData(),
         :output_path => "wavi_input_test",
     )
     merge!(defaults, Dict{Symbol, Any}(pairs(kwargs)))

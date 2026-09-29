@@ -12,51 +12,51 @@ export write_output, write_binary_files, write_netcdf_file
 # Each entry: (filename / varname, long_name, units, standard_name or nothing)
 
 const _H_GRID_VARS = [
-    ("thickness",          "Ice thickness",                       "m",      "land_ice_thickness"),
-    ("surface",            "Ice surface elevation",               "m",      "surface_altitude"),
-    ("bed",                "Bed topography",                      "m",      "bedrock_altitude"),
-    ("h_mask",             "Ice grid mask",                       "1",      nothing),
-    ("basinID",            "Drainage basin ID",                   "1",      nothing),
-    ("accumulation_data",  "Surface mass balance (accumulation)", "m yr-1", "land_ice_surface_specific_mass_balance"),
-    ("dhdt_data",          "Ice thickness change rate",           "m yr-1", "tendency_of_land_ice_thickness"),
-    ("dhdt_acc_mask",      "dh/dt and accumulation data mask",    "1",      nothing),
+    ("thickness", "Ice thickness", "m", "land_ice_thickness"),
+    ("surface", "Ice surface elevation", "m", "surface_altitude"),
+    ("bed", "Bed topography", "m", "bedrock_altitude"),
+    ("h_mask", "Ice grid mask", "1", nothing),
+    ("basinID", "Drainage basin ID", "1", nothing),
+    ("accumulation_data", "Surface mass balance (accumulation)", "m yr-1", "land_ice_surface_specific_mass_balance"),
+    ("dhdt_data", "Ice thickness change rate", "m yr-1", "tendency_of_land_ice_thickness"),
+    ("dhdt_acc_mask", "dh/dt and accumulation data mask", "1", nothing),
 ]
 
 const _U_GRID_VARS = [
-    ("udata",      "Ice velocity (x-component)",       "m yr-1", "land_ice_x_velocity"),
-    ("udata_mask", "Velocity data mask (x-component)", "1",      nothing),
-    ("u_iszero",   "Velocity zero mask (x-component)", "1",      nothing),
+    ("udata", "Ice velocity (x-component)", "m yr-1", "land_ice_x_velocity"),
+    ("udata_mask", "Velocity data mask (x-component)", "1", nothing),
+    ("u_iszero", "Velocity zero mask (x-component)", "1", nothing),
 ]
 
 const _V_GRID_VARS = [
-    ("vdata",      "Ice velocity (y-component)",       "m yr-1", "land_ice_y_velocity"),
-    ("vdata_mask", "Velocity data mask (y-component)", "1",      nothing),
-    ("v_iszero",   "Velocity zero mask (y-component)", "1",      nothing),
+    ("vdata", "Ice velocity (y-component)", "m yr-1", "land_ice_y_velocity"),
+    ("vdata_mask", "Velocity data mask (y-component)", "1", nothing),
+    ("v_iszero", "Velocity zero mask (y-component)", "1", nothing),
 ]
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
 const _H_FIELD_MAP = Dict(
-    "thickness"         => :h_clip,
-    "surface"           => :s_clip,
-    "bed"               => :b_clip,
-    "h_mask"            => :mask_clip,
-    "basinID"           => :basinID_clip,
+    "thickness" => :h_clip,
+    "surface" => :s_clip,
+    "bed" => :b_clip,
+    "h_mask" => :mask_clip,
+    "basinID" => :basinID_clip,
     "accumulation_data" => :a_Arthern_clip,
-    "dhdt_data"         => :dhdt_clip,
-    "dhdt_acc_mask"     => :dhdtAccDataMask_clip,
+    "dhdt_data" => :dhdt_clip,
+    "dhdt_acc_mask" => :dhdtAccDataMask_clip,
 )
 
 const _U_FIELD_MAP = Dict(
-    "udata"      => :uData_clip,
+    "udata" => :uData_clip,
     "udata_mask" => :uDataMaskFull_clip,
-    "u_iszero"   => :uiszero_clip,
+    "u_iszero" => :uiszero_clip,
 )
 
 const _V_FIELD_MAP = Dict(
-    "vdata"      => :vData_clip,
+    "vdata" => :vData_clip,
     "vdata_mask" => :vDataMaskFull_clip,
-    "v_iszero"   => :viszero_clip,
+    "v_iszero" => :viszero_clip,
 )
 
 """
@@ -66,7 +66,7 @@ Return `Vector{Tuple{String, String, String, Union{String,Nothing}, AbstractArra
 for every variable whose backing field exists on `grid`.
 """
 function _collect_grid_fields(grid, var_meta, field_map)
-    out = Vector{Tuple{String, String, String, Union{String,Nothing}, AbstractArray}}()
+    out = Vector{Tuple{String, String, String, Union{String, Nothing}, AbstractArray}}()
     for (name, long_name, units, std_name) in var_meta
         field = field_map[name]
         if haskey(grid, field)
@@ -126,7 +126,7 @@ function write_binary_files(Gh, Gu, Gv, output_path)
         end
     end
 
-    @info "Binary output written" path = output_path
+    return @info "Binary output written" path = output_path
 end
 
 # ── NetCDF writing ────────────────────────────────────────────────────
@@ -153,9 +153,11 @@ metadata (units, long names, coordinate variables, global attributes).
 - **Per-variable attributes**: `long_name`, `units`, `standard_name` (where
   applicable), and `_FillValue = -9999.0`.
 """
-function write_netcdf_file(Gh, Gu, Gv, output_path;
-                           filename::String = "wavi_input.nc",
-                           overwrite::Bool = false)
+function write_netcdf_file(
+        Gh, Gu, Gv, output_path;
+        filename::String = "wavi_input.nc",
+        overwrite::Bool = false
+    )
     mkpath(output_path)
     filepath = joinpath(output_path, filename)
 
@@ -174,8 +176,8 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
     nx_v, ny_v = isempty(v_fields) ? (nx_h, ny_h) : size(v_fields[1][5])
 
     has_temp = haskey(Gh, :levels) &&
-               haskey(Gh.levels, :temperature_clip) &&
-               haskey(Gh.levels, :sigma_full)
+        haskey(Gh.levels, :temperature_clip) &&
+        haskey(Gh.levels, :sigma_full)
     nz = has_temp ? length(Gh.levels.sigma_full) : 0
 
     # ── Coordinate vectors ────────────────────────────────────────────
@@ -187,10 +189,10 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
 
     try
         # — Global attributes —
-        ds.attrib["Conventions"]  = "CF-1.8"
-        ds.attrib["title"]        = "WAVI model input data"
-        ds.attrib["source"]       = "WAVIConstructor.jl"
-        ds.attrib["history"]      = "Created $(Dates.format(now(), "yyyy-mm-dd HH:MM:SS"))"
+        ds.attrib["Conventions"] = "CF-1.8"
+        ds.attrib["title"] = "WAVI model input data"
+        ds.attrib["source"] = "WAVIConstructor.jl"
+        ds.attrib["history"] = "Created $(Dates.format(now(), "yyyy-mm-dd HH:MM:SS"))"
         ds.attrib["grid_spacing_m"] = Gh.dx
         ds.attrib["domain_origin_x_m"] = Gh.x0_clip
         ds.attrib["domain_origin_y_m"] = Gh.y0_clip
@@ -210,13 +212,13 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
 
         xvar = defVar(ds, "x", Float64, ("x",))
         xvar.attrib["long_name"] = "Easting (H-grid)"
-        xvar.attrib["units"]     = "m"
+        xvar.attrib["units"] = "m"
         xvar.attrib["standard_name"] = "projection_x_coordinate"
         xvar[:] = x_h
 
         yvar = defVar(ds, "y", Float64, ("y",))
         yvar.attrib["long_name"] = "Northing (H-grid)"
-        yvar.attrib["units"]     = "m"
+        yvar.attrib["units"] = "m"
         yvar.attrib["standard_name"] = "projection_y_coordinate"
         yvar[:] = y_h
 
@@ -226,11 +228,11 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
             defDim(ds, "yu", ny_u)
             xu_var = defVar(ds, "xu", Float64, ("xu",))
             xu_var.attrib["long_name"] = "Easting (U-grid, staggered in x)"
-            xu_var.attrib["units"]     = "m"
+            xu_var.attrib["units"] = "m"
             xu_var[:] = haskey(Gu, :xx) ? Gu.xx[1:nx_u, 1] : collect(1.0:nx_u)
             yu_var = defVar(ds, "yu", Float64, ("yu",))
             yu_var.attrib["long_name"] = "Northing (U-grid)"
-            yu_var.attrib["units"]     = "m"
+            yu_var.attrib["units"] = "m"
             yu_var[:] = haskey(Gu, :yy) ? Gu.yy[1, 1:ny_u] : collect(1.0:ny_u)
         end
 
@@ -240,11 +242,11 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
             defDim(ds, "yv", ny_v)
             xv_var = defVar(ds, "xv", Float64, ("xv",))
             xv_var.attrib["long_name"] = "Easting (V-grid)"
-            xv_var.attrib["units"]     = "m"
+            xv_var.attrib["units"] = "m"
             xv_var[:] = haskey(Gv, :xx) ? Gv.xx[1:nx_v, 1] : collect(1.0:nx_v)
             yv_var = defVar(ds, "yv", Float64, ("yv",))
             yv_var.attrib["long_name"] = "Northing (V-grid, staggered in y)"
-            yv_var.attrib["units"]     = "m"
+            yv_var.attrib["units"] = "m"
             yv_var[:] = haskey(Gv, :yy) ? Gv.yy[1, 1:ny_v] : collect(1.0:ny_v)
         end
 
@@ -252,10 +254,10 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
         if has_temp
             defDim(ds, "sigma", nz)
             svar = defVar(ds, "sigma", Float64, ("sigma",))
-            svar.attrib["long_name"]      = "Normalised depth coordinate (0=surface, 1=base)"
-            svar.attrib["units"]          = "1"
-            svar.attrib["positive"]       = "down"
-            svar.attrib["standard_name"]  = "land_ice_sigma_coordinate"
+            svar.attrib["long_name"] = "Normalised depth coordinate (0=surface, 1=base)"
+            svar.attrib["units"] = "1"
+            svar.attrib["positive"] = "down"
+            svar.attrib["standard_name"] = "land_ice_sigma_coordinate"
             svar[:] = Gh.levels.sigma_full
         end
 
@@ -265,8 +267,8 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
         for (name, long_name, units, std_name, data) in _collect_h_fields(Gh)
             v = defVar(ds, name, Float64, ("x", "y"), fillvalue = fill_val)
             v.attrib["long_name"] = long_name
-            v.attrib["units"]     = units
-            v.attrib["grid"]      = "h_grid"
+            v.attrib["units"] = units
+            v.attrib["grid"] = "h_grid"
             if std_name !== nothing
                 v.attrib["standard_name"] = std_name
             end
@@ -277,8 +279,8 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
         for (name, long_name, units, std_name, data) in u_fields
             v = defVar(ds, name, Float64, ("xu", "yu"), fillvalue = fill_val)
             v.attrib["long_name"] = long_name
-            v.attrib["units"]     = units
-            v.attrib["grid"]      = "u_grid"
+            v.attrib["units"] = units
+            v.attrib["grid"] = "u_grid"
             if std_name !== nothing
                 v.attrib["standard_name"] = std_name
             end
@@ -289,8 +291,8 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
         for (name, long_name, units, std_name, data) in v_fields
             v = defVar(ds, name, Float64, ("xv", "yv"), fillvalue = fill_val)
             v.attrib["long_name"] = long_name
-            v.attrib["units"]     = units
-            v.attrib["grid"]      = "v_grid"
+            v.attrib["units"] = units
+            v.attrib["grid"] = "v_grid"
             if std_name !== nothing
                 v.attrib["standard_name"] = std_name
             end
@@ -299,11 +301,13 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
 
         # — 3-D temperature (x, y, sigma) —
         if has_temp
-            tvar = defVar(ds, "temperature", Float64, ("x", "y", "sigma"),
-                          fillvalue = fill_val)
-            tvar.attrib["long_name"]      = "Ice temperature"
-            tvar.attrib["units"]          = "K"
-            tvar.attrib["standard_name"]  = "land_ice_temperature"
+            tvar = defVar(
+                ds, "temperature", Float64, ("x", "y", "sigma"),
+                fillvalue = fill_val
+            )
+            tvar.attrib["long_name"] = "Ice temperature"
+            tvar.attrib["units"] = "K"
+            tvar.attrib["standard_name"] = "land_ice_temperature"
             tvar[:, :, :] = Float64.(Gh.levels.temperature_clip)
         end
 
@@ -330,10 +334,12 @@ Write WAVI model input data in the requested format.
 - `nc_filename`: Name of the NetCDF file (default `"wavi_input.nc"`).
 - `overwrite`: Whether to overwrite existing files (default `false`).
 """
-function write_output(Gh, Gu, Gv, output_path;
-                      format::Symbol = :bin,
-                      nc_filename::String = "wavi_input.nc",
-                      overwrite::Bool = false)
+function write_output(
+        Gh, Gu, Gv, output_path;
+        format::Symbol = :bin,
+        nc_filename::String = "wavi_input.nc",
+        overwrite::Bool = false
+    )
     if format ∉ (:bin, :netcdf, :both)
         error("Unknown output format :$format — expected :bin, :netcdf, or :both")
     end
@@ -342,10 +348,12 @@ function write_output(Gh, Gu, Gv, output_path;
         write_binary_files(Gh, Gu, Gv, output_path)
     end
 
-    if format in (:netcdf, :both)
-        write_netcdf_file(Gh, Gu, Gv, output_path;
-                          filename = nc_filename,
-                          overwrite = overwrite)
+    return if format in (:netcdf, :both)
+        write_netcdf_file(
+            Gh, Gu, Gv, output_path;
+            filename = nc_filename,
+            overwrite = overwrite
+        )
     end
 end
 

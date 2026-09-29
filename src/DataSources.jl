@@ -33,25 +33,25 @@ subtype.
 abstract type DataSource end
 
 """Bed topography sources (e.g. BedMachine)."""
-abstract type BedSource       <: DataSource end
+abstract type BedSource <: DataSource end
 
 """Mean annual surface temperature sources (e.g. ALBMAP)."""
-abstract type SurfaceTempSource  <: DataSource end
+abstract type SurfaceTempSource <: DataSource end
 
 """3-D temperature field sources."""
 abstract type TemperatureSource <: DataSource end
 
 """Ice velocity sources."""
-abstract type VelocitySource  <: DataSource end
+abstract type VelocitySource <: DataSource end
 
 """Snow/ice accumulation sources."""
 abstract type AccumulationSource <: DataSource end
 
 """Ice elevation-change (dh/dt) sources."""
-abstract type DhDtSource      <: DataSource end
+abstract type DhDtSource <: DataSource end
 
 """Drainage-basin delineation sources."""
-abstract type BasinSource     <: DataSource end
+abstract type BasinSource <: DataSource end
 
 # ── Cross-cutting sentinel ────────────────────────────────────────────
 
@@ -123,13 +123,13 @@ SourceConfig(BISICLESTemps(), "my/custom/path/temps.nc")           # custom path
 SourceConfig(NoData())                                              # skip this category
 ```
 """
-struct SourceConfig{S<:DataSource}
+struct SourceConfig{S <: DataSource}
     source::S
     path::String
 end
 
 # Convenience: use the default path when only the source is given.
-SourceConfig(s::S) where {S<:DataSource} = SourceConfig(s, default_path(s))
+SourceConfig(s::S) where {S <: DataSource} = SourceConfig(s, default_path(s))
 
 # ── Auto-conversion (bare singletons & tuples) ───────────────────────
 # Allows writing `bed = BedMachineV3()` or `bed = (BedMachineV3(), "path")`
