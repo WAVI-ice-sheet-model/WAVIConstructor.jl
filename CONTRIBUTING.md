@@ -1,6 +1,6 @@
 # Contributing to WAVIConstructor.jl
 
-Thank you for your interest in contributing! This guide covers setting up a development environment, running tests, adding new datasets, and the workflow for branches, pull requests, and releases.
+Thank you for your interest in contributing! This guide covers setting up a development environment, running tests, formatting code, adding new datasets, and the workflow for branches, pull requests, and releases.
 
 ## Development Environment Setup
 
@@ -33,6 +33,31 @@ Or from the Julia REPL:
 using Pkg
 Pkg.test()
 ```
+
+## Code Formatting
+
+This project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) to keep code formatting consistent. Runic has no configuration options, so there is nothing to set up beyond installing it. A CI check fails any pull request that contains unformatted code.
+
+**Install (Julia 1.12+):**
+```sh
+julia -e 'using Pkg; Pkg.Apps.add("Runic")'
+```
+This installs a `runic` command into `~/.julia/bin` (or `$JULIA_DEPOT_PATH/bin`). Add that folder to your `PATH` if needed.
+
+**Format before pushing** (run from the repository root):
+```sh
+runic --inplace src/ test/ examples/ docs/
+```
+To check without changing files: `runic --check --diff src/ test/ examples/ docs/`
+**If the format check fails on your PR**, run the command above, commit the changes, and push again.
+
+**VS Code (optional):** install the "Custom Local Formatters" extension and add to your `settings.json`:
+```json
+"customLocalFormatters.formatters": [
+  { "command": "runic", "languages": ["julia"] }
+]
+```
+Then *Format Document* uses Runic.
 
 
 ## Adding a New Dataset

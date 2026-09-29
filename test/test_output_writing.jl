@@ -15,35 +15,35 @@ using NCDatasets
     Gh = (
         nx_clip = nx,
         ny_clip = ny,
-        dx      = 1000.0,
+        dx = 1000.0,
         x0_clip = 0.0,
         y0_clip = 0.0,
         xx_clip = xx,
         yy_clip = yy,
-        h_clip  = rand(nx, ny),
-        s_clip  = rand(nx, ny),
-        b_clip  = rand(nx, ny),
-        mask_clip          = mask,
-        basinID_clip       = ones(nx, ny),
-        a_Arthern_clip     = rand(nx, ny),
-        dhdt_clip          = rand(nx, ny),
+        h_clip = rand(nx, ny),
+        s_clip = rand(nx, ny),
+        b_clip = rand(nx, ny),
+        mask_clip = mask,
+        basinID_clip = ones(nx, ny),
+        a_Arthern_clip = rand(nx, ny),
+        dhdt_clip = rand(nx, ny),
         dhdtAccDataMask_clip = mask,
         levels = (
-            sigma_full       = [0.0, 0.25, 0.5, 0.75, 1.0],
+            sigma_full = [0.0, 0.25, 0.5, 0.75, 1.0],
             temperature_clip = rand(nx, ny, 5),
         ),
     )
 
     Gu = (
-        uData_clip         = rand(nx, ny),
+        uData_clip = rand(nx, ny),
         uDataMaskFull_clip = mask,
-        uiszero_clip       = falses(nx, ny),
+        uiszero_clip = falses(nx, ny),
     )
 
     Gv = (
-        vData_clip         = rand(nx, ny),
+        vData_clip = rand(nx, ny),
         vDataMaskFull_clip = mask,
-        viszero_clip       = falses(nx, ny),
+        viszero_clip = falses(nx, ny),
     )
 
     # ── Test binary output ───────────────────────────────────────────
@@ -71,14 +71,16 @@ using NCDatasets
     # ── Test NetCDF output ───────────────────────────────────────────
     @testset "write_netcdf_file" begin
         dir = mktempdir()
-        ncpath = WAVIConstructor.OutputWriting.write_netcdf_file(Gh, Gu, Gv, dir;
-                                                                  overwrite = true)
+        ncpath = WAVIConstructor.OutputWriting.write_netcdf_file(
+            Gh, Gu, Gv, dir;
+            overwrite = true
+        )
         @test isfile(ncpath)
 
         NCDataset(ncpath) do ds
             # Global attributes
             @test ds.attrib["Conventions"] == "CF-1.8"
-            @test ds.attrib["source"]      == "WAVIConstructor.jl"
+            @test ds.attrib["source"] == "WAVIConstructor.jl"
             @test ds.attrib["grid_spacing_m"] == 1000.0
 
             # Coordinate variables
@@ -109,25 +111,26 @@ using NCDatasets
     @testset "write_output dispatcher" begin
         # :bin only
         dir_bin = mktempdir()
-        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_bin; format=:bin)
+        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_bin; format = :bin)
         @test isfile(joinpath(dir_bin, "thickness.bin"))
         @test !isfile(joinpath(dir_bin, "wavi_input.nc"))
 
         # :netcdf only
         dir_nc = mktempdir()
-        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_nc; format=:netcdf)
+        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_nc; format = :netcdf)
         @test !isfile(joinpath(dir_nc, "thickness.bin"))
         @test isfile(joinpath(dir_nc, "wavi_input.nc"))
 
         # :both
         dir_both = mktempdir()
-        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_both; format=:both)
+        WAVIConstructor.OutputWriting.write_output(Gh, Gu, Gv, dir_both; format = :both)
         @test isfile(joinpath(dir_both, "thickness.bin"))
         @test isfile(joinpath(dir_both, "wavi_input.nc"))
 
         # invalid format
         @test_throws ErrorException WAVIConstructor.OutputWriting.write_output(
-            Gh, Gu, Gv, mktempdir(); format=:csv)
+            Gh, Gu, Gv, mktempdir(); format = :csv
+        )
     end
 
     # ── Test ConstructorParams output_format field ───────────────────
