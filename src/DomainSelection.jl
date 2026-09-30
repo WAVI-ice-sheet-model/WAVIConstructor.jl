@@ -3,8 +3,6 @@
 
 module DomainSelection
 
-using ImageFiltering
-
 export select_domain_wavi
 
 """
@@ -85,10 +83,16 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     gh_mask_size = size(Gh_mask)
     
     # For U-grid: should match size of Gu.xx 
-    # MATLAB conv2([1 1]', 1, A) expands first dimension by 1
+    # MATLAB conv2([1;1], 1, A) for (nx,ny) input gives (nx+1,ny):
+    #   row 1     = A[1,:]
+    #   row i     = A[i-1,:] | A[i,:]   for 2 ≤ i ≤ nx
+    #   row nx+1  = A[nx,:]
     if gu_size[1] == gh_mask_size[1] + 1 && gu_size[2] == gh_mask_size[2]
-        # Standard case: U-grid has one more row than H-grid
-        Gu_mask = [Gh_mask[1:end-1, :] .| Gh_mask[2:end, :]; Gh_mask[end:end, :]]
+        Gu_mask = [
+            Gh_mask[1:1, :];
+            Gh_mask[1:end-1, :] .| Gh_mask[2:end, :];
+            Gh_mask[end:end, :]
+        ]
     else
         # Fall back to resizing
         Gu_mask = falses(gu_size)
@@ -96,10 +100,16 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     end
     
     # For V-grid: should match size of Gv.xx
-    # MATLAB conv2(1, [1 1], A) expands second dimension by 1
+    # MATLAB conv2(1, [1 1], A) for (nx,ny) input gives (nx,ny+1):
+    #   col 1     = A[:,1]
+    #   col j     = A[:,j-1] | A[:,j]   for 2 ≤ j ≤ ny
+    #   col ny+1  = A[:,ny]
     if gv_size[1] == gh_mask_size[1] && gv_size[2] == gh_mask_size[2] + 1
-        # Standard case: V-grid has one more column than H-grid
-        Gv_mask = [Gh_mask[:, 1:end-1] .| Gh_mask[:, 2:end] Gh_mask[:, end:end]]
+        Gv_mask = hcat(
+            Gh_mask[:, 1:1],
+            Gh_mask[:, 1:end-1] .| Gh_mask[:, 2:end],
+            Gh_mask[:, end:end]
+        )
     else
         # Fall back to resizing
         Gv_mask = falses(gv_size)

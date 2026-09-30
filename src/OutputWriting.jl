@@ -101,28 +101,22 @@ function write_binary_files(Gh, Gu, Gv, output_path)
 
     for (name, _, _, _, data) in field_pairs
         filepath = joinpath(output_path, name * ".bin")
-        if !isfile(filepath)
-            open(filepath, "w") do io
-                write(io, Float64.(data))
-            end
+        open(filepath, "w") do io
+            write(io, Float64.(data))
         end
     end
 
     # Temperature & sigma
     if haskey(Gh, :levels) && haskey(Gh.levels, :temperature_clip)
         filepath = joinpath(output_path, "temps.bin")
-        if !isfile(filepath)
-            open(filepath, "w") do io
-                write(io, Float64.(Gh.levels.temperature_clip))
-            end
+        open(filepath, "w") do io
+            write(io, Float64.(Gh.levels.temperature_clip))
         end
     end
     if haskey(Gh, :levels) && haskey(Gh.levels, :sigma_full)
         filepath = joinpath(output_path, "sigma_grid.bin")
-        if !isfile(filepath)
-            open(filepath, "w") do io
-                write(io, Float64.(Gh.levels.sigma_full))
-            end
+        open(filepath, "w") do io
+            write(io, Float64.(Gh.levels.sigma_full))
         end
     end
 
@@ -133,8 +127,7 @@ end
 
 """
     write_netcdf_file(Gh, Gu, Gv, output_path;
-                      filename = "wavi_input.nc",
-                      overwrite = false)
+                      filename = "wavi_input.nc")
 
 Write all clipped data to a single CF-compliant NetCDF-4 file with full
 metadata (units, long names, coordinate variables, global attributes).
@@ -160,9 +153,10 @@ function write_netcdf_file(Gh, Gu, Gv, output_path;
     filepath = joinpath(output_path, filename)
 
     if isfile(filepath) && !overwrite
-        @info "NetCDF file already exists; skipping" filepath
-        return filepath
+        error("NetCDF file already exists at $filepath. Pass `overwrite = true` to replace it.")
     end
+
+
 
     # ── Determine dimensions ──────────────────────────────────────────
     nx_h, ny_h = Gh.nx_clip, Gh.ny_clip
@@ -318,7 +312,7 @@ end
 # ── Unified dispatcher ────────────────────────────────────────────────
 
 """
-    write_output(Gh, Gu, Gv, output_path; format=:bin, nc_filename="wavi_input.nc", overwrite=false)
+    write_output(Gh, Gu, Gv, output_path; format=:bin, nc_filename="wavi_input.nc")
 
 Write WAVI model input data in the requested format.
 
@@ -328,12 +322,12 @@ Write WAVI model input data in the requested format.
   - `:netcdf` — single CF-compliant NetCDF-4 file.
   - `:both`   — write both formats side by side.
 - `nc_filename`: Name of the NetCDF file (default `"wavi_input.nc"`).
-- `overwrite`: Whether to overwrite existing files (default `false`).
+
 """
 function write_output(Gh, Gu, Gv, output_path;
                       format::Symbol = :bin,
                       nc_filename::String = "wavi_input.nc",
-                      overwrite::Bool = false)
+)
     if format ∉ (:bin, :netcdf, :both)
         error("Unknown output format :$format — expected :bin, :netcdf, or :both")
     end
@@ -344,8 +338,7 @@ function write_output(Gh, Gu, Gv, output_path;
 
     if format in (:netcdf, :both)
         write_netcdf_file(Gh, Gu, Gv, output_path;
-                          filename = nc_filename,
-                          overwrite = overwrite)
+                          filename = nc_filename, overwrite = true)
     end
 end
 
