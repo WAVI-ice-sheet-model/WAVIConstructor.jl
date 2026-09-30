@@ -147,9 +147,14 @@ metadata (units, long names, coordinate variables, global attributes).
   applicable), and `_FillValue = -9999.0`.
 """
 function write_netcdf_file(Gh, Gu, Gv, output_path;
-                           filename::String = "wavi_input.nc")
+                           filename::String = "wavi_input.nc",
+                           overwrite::Bool = false)
     mkpath(output_path)
     filepath = joinpath(output_path, filename)
+
+    if isfile(filepath) && !overwrite
+        error("NetCDF file already exists at $filepath. Pass `overwrite = true` to replace it.")
+    end
 
 
 
