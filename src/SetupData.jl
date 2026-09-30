@@ -109,8 +109,6 @@ function setup_wavi_data(params; output_path="outputs", edge=3, output_format=no
         s_clip = Gh.s[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
         h_clip = Gh.h[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
         b_clip = Gh.b[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
-        a_clip = Gh.a[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
-        aground_clip = Gh.aground[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
         dhdt_clip = Gh.dhdt[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
         basinID_clip = Gh.basinID[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
         a_Arthern_clip = Gh.a_Arthern[I_clip_min:I_clip_max, J_clip_min:J_clip_max],
@@ -243,7 +241,7 @@ function replace_nans_in_clipped_data(Gh)
         end
     end
     
-    for field in [:h_clip, :s_clip, :b_clip, :a_clip, :dhdt_clip, :a_Arthern_clip]
+    for field in [:h_clip, :s_clip, :b_clip, :dhdt_clip, :a_Arthern_clip]
         if haskey(Gh, field)
             data = getproperty(Gh, field)
             nan_mask = isnan.(data) .& .!Gh.mask_clip

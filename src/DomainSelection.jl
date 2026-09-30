@@ -3,8 +3,6 @@
 
 module DomainSelection
 
-using ImageFiltering
-
 export select_domain_wavi
 
 """

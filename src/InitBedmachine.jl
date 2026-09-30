@@ -341,15 +341,11 @@ function load_velocity_data(Gu, Gv, Gh, params)
     end
 
     Gu = merge(Gu, (
-        u_data = u_data,
-        u_data_mask = .!isnan.(u_data) .& (u_data .!= 0.0),
         uData = u_data,
         uDataMask = .!isnan.(u_data) .& (u_data .!= 0.0)
     ))
 
     Gv = merge(Gv, (
-        v_data = v_data,
-        v_data_mask = .!isnan.(v_data) .& (v_data .!= 0.0),
         vData = v_data,
         vDataMask = .!isnan.(v_data) .& (v_data .!= 0.0)
     ))

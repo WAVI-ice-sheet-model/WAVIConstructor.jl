@@ -338,7 +338,7 @@ function write_output(Gh, Gu, Gv, output_path;
 
     if format in (:netcdf, :both)
         write_netcdf_file(Gh, Gu, Gv, output_path;
-                          filename = nc_filename)
+                          filename = nc_filename, overwrite = true)
     end
 end
 
