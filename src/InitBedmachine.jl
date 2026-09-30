@@ -36,27 +36,30 @@ function init_bedmachine(params)
     h         = bm.thickness
     s         = bm.surface
 
-    # Flip arrays to match MATLAB's fliplr (reverse along dimension 2 = columns/y-axis)
+    # Flip arrays to match MATLAB's fliplr (reverse along dimension 2 = columns/y-axis).
+    # BedMachine v3 stores y in descending order; flip y too so the coordinate
+    # vector stays consistent with the flipped data arrays (ascending y).
     bed   = reverse(bed, dims=2)
     geoid = reverse(geoid, dims=2)
     mask  = reverse(mask, dims=2)
     s     = reverse(s, dims=2)
     h     = reverse(h, dims=2)
+    y     = reverse(y)
 
     # Create rock mask (mask=1 in BedMachine v3 indicates rock
     rockmask = zeros(size(mask))
     rockmask[mask .== 1] .= 1
 
-    # Grid parameters
-    nx_full = 13333
-    ny_full = 13333
-    x0_full = -3333000 - 250
-    y0_full = -3333000 - 250
-    dx_full = 500
-    dy_full = 500
+    # Grid parameters derived from loaded BedMachine data
+    dx_full = x[2] - x[1]
+    dy_full = y[2] - y[1]
+    nx_full = length(x)
+    ny_full = length(y)
+    x0_full = x[1] - 0.5 * dx_full
+    y0_full = y[1] - 0.5 * dy_full
 
-    x_full = x0_full .+ (0.5:(nx_full-0.5)) .* dx_full
-    y_full = y0_full .+ (0.5:(ny_full-0.5)) .* dy_full
+    x_full = x
+    y_full = y
 
     i_pole = floor(Int, -x0_full / dx_full + 0.5)
     j_pole = floor(Int, -y0_full / dy_full + 0.5)

@@ -301,9 +301,10 @@ function load_data(::SmithDhdt, smith_dir::String; grnd_file=nothing, flt_file=n
     
     # Determine which files to load
     if grnd_file === nothing && flt_file === nothing
-        # Load both from default directory
+        # Load both from default directory. MATLAB (getSmith_dhdt.m) reads the
+        # corrected floating product, so match that here for consistency.
         grnd_file = joinpath(smith_dir, "ais_grounded.tif")
-        flt_file = joinpath(smith_dir, "ais_floating.tif")
+        flt_file = joinpath(smith_dir, "ais_floating_corrected.tif")
     end
     
     # Load files
@@ -585,15 +586,15 @@ BISICLES stores `(sigma_levels, ny, nx)` with 1-D coordinate vectors.
 Values above 273.148 K are treated as invalid ocean fill and masked
 before interpolation.
 
-Uses gridded linear interpolation with nearest-neighbor extrapolation
-to match MATLAB's `scatteredInterpolant(..., 'linear', 'nearest')`.
-
-Matches MATLAB's cumulative ocean masking: once a spatial point is
-identified as ocean (>273.148 K) at any sigma level, it is NaN'd
-for all subsequent levels too.
+Matches MATLAB (`initBedmachineV3.m`): masking is applied **per sigma
+level** (not cumulatively), then each level is interpolated with
+`scatteredInterpolant(..., 'nearest', 'nearest')` — i.e. plain
+nearest-neighbour interpolation with nearest-neighbour extrapolation
+(no NaN outside the convex hull). `interpolate_to_grid` with the
+default `max_dist = Inf` reproduces this exactly.
 """
 function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
-    temps_raw = copy(temp_data.temps)       # copy so we can NaN-mask in place
+    temps_raw = temp_data.temps
     sigmas    = temp_data.sigma
 
     bisicles_x = temp_data.xx
@@ -604,22 +605,12 @@ function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
 
     temperature = zeros(length(sigmas), Gh.nx, Gh.ny)
 
-    # Cumulative ocean mask across all sigma levels (matching MATLAB)
-    # MATLAB: bisicles_mask_full accumulates, then NaNs the ENTIRE 3D array
-    ny_b, nx_b = size(bisicles_xx)
-    cumulative_mask = falses(length(sigmas), ny_b, nx_b)
-
     for i in 1:length(sigmas)
-        # Identify ocean at this level
-        ocean_mask_2d = temps_raw[i, :, :] .> 273.1480
-        cumulative_mask[i, :, :] .= ocean_mask_2d
+        # Per-level ocean masking (matches MATLAB: this_temp(this_temp>273.148)=NaN)
+        this_temp = temps_raw[i, :, :]
+        this_temp[this_temp .> 273.1480] .= NaN
 
-        # Apply cumulative mask to entire 3D array (matches MATLAB)
-        temps_raw[cumulative_mask] .= NaN
-
-        this_temp  = temps_raw[i, :, :]
         valid_mask = .!isnan.(this_temp)
-
         xx_valid   = bisicles_xx[valid_mask]
         yy_valid   = bisicles_yy[valid_mask]
         temp_valid = this_temp[valid_mask]
@@ -629,31 +620,9 @@ function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
             continue
         end
 
-        # Use gridded linear interpolation with nearest-neighbor extrapolation
-        # to match MATLAB's scatteredInterpolant(..., 'linear', 'nearest').
-        # Since BISICLES is on a regular grid, we fill NaN holes first with
-        # nearest-neighbor, then do bilinear interpolation.
-        try
-            filled_temp = copy(this_temp)
-            if any(.!valid_mask)
-                tree = KDTree(hcat(xx_valid, yy_valid)')
-                nan_xx = bisicles_xx[.!valid_mask]
-                nan_yy = bisicles_yy[.!valid_mask]
-                idxs, _ = knn(tree, hcat(nan_xx, nan_yy)', 1, true)
-                filled_temp[.!valid_mask] .= [temp_valid[idx[1]] for idx in idxs]
-            end
-
-            # Build gridded linear interpolation on the regular BISICLES grid
-            itp = LinearInterpolation((bisicles_y, bisicles_x), filled_temp;
-                                      extrapolation_bc=Flat())
-            for ix in 1:Gh.nx, iy in 1:Gh.ny
-                temperature[i, ix, iy] = itp(Gh.yy[ix, iy], Gh.xx[ix, iy])
-            end
-        catch e
-            # Fall back to KDTree nearest-neighbor if gridded interpolation fails
-            @warn "BISICLES gridded interpolation failed at level $i, falling back to nearest-neighbor" exception=e
-            temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
-        end
+        # Plain nearest-neighbour over valid points, matching MATLAB's
+        # scatteredInterpolant(..., 'nearest', 'nearest').
+        temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)
     end
     return temperature, sigmas
 end

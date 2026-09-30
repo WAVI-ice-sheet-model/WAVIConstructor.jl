@@ -50,7 +50,6 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     Gh_globalMask[1:end-1, 2:end] .|= Gc_globalMask
     Gh_globalMask[2:end, 1:end-1] .|= Gc_globalMask
     Gh_globalMask[2:end, 2:end] .|= Gc_globalMask
-    # Note: no .&= Gh.ok clamp here — MATLAB conv2 dilates outward beyond ok cells
     
     # Create mask for locations on the h-grid to include in model
     # MATLAB's ismember equivalent
@@ -78,8 +77,6 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     Gh_mask[1:end-1, 2:end] .|= Gc_mask
     Gh_mask[2:end, 1:end-1] .|= Gc_mask
     Gh_mask[2:end, 2:end] .|= Gc_mask
-    # Note: no .&= Gh.ok clamp here — MATLAB conv2 dilates outward beyond ok cells,
-    # intentionally including a one-cell halo around valid ice for the stress stencil.
     
     # Expand H-grid mask to U-grid and V-grid to match actual grid sizes
     # U-grid and V-grid sizes are determined by Gu.xx and Gv.xx
