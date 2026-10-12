@@ -32,8 +32,8 @@ function load_data(::ALBMAPv1, filename::String)
     dx, dy = float(x1[2] - x1[1]), float(y1[2] - y1[1])
     nx, ny = length(x1), length(y1)
     x0, y0 = float(x1[1]) - 0.5 * dx, float(y1[1]) - 0.5 * dy
-    xx = [x0 + (i-0.5)*dx for i in 1:nx, j in 1:ny]
-    yy = [y0 + (j-0.5)*dy for i in 1:nx, j in 1:ny]
+    xx = [x0 + (i - 0.5) * dx for i in 1:nx, j in 1:ny]
+    yy = [y0 + (j - 0.5) * dy for i in 1:nx, j in 1:ny]
 
     usrf, lsrf, firn = data["usrf"], data["lsrf"], data["firn"]
     h = permutedims(usrf - lsrf - firn)
@@ -84,8 +84,10 @@ function load_data(::BedMachineV3, filename::String)
         mask = Array(ds["mask"])
         surface = Array(ds["surface"])
         thickness = Array(ds["thickness"])
-        return (bed = bed, x = x, y = y, geoid = geoid, mask = mask,
-                thickness = thickness, surface = surface)
+        return (
+            bed = bed, x = x, y = y, geoid = geoid, mask = mask,
+            thickness = thickness, surface = surface,
+        )
     finally
         close(ds)
     end
@@ -100,13 +102,13 @@ Load temperature and coordinate data from a BISICLES NetCDF file.
 # Returns
 A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::FrankTemps, …)`.
 """
-function load_data(::BISICLESTemps, filename::String; scale_xy::Real=1)
+function load_data(::BISICLESTemps, filename::String; scale_xy::Real = 1)
     ds = NCDataset(filename)
     try
         bisicles_sigma = vec(Array(ds["sigma"]))
         bisicles_temps = Array(ds["T"])
         bisicles_x = vec(scale_xy .* Array(ds["x"]))
-        bisicles_y = vec(scale_xy .* Array(ds["y"]))  
+        bisicles_y = vec(scale_xy .* Array(ds["y"]))
 
         return (temps = bisicles_temps, xx = bisicles_x, yy = bisicles_y, sigma = bisicles_sigma)
     finally
@@ -129,7 +131,7 @@ function load_data(::MEaSUREs, filename::String)
         Measures_y = Array(ds["y"])
         VX = Array(ds["VX"])
         VY = Array(ds["VY"])
-        
+
         # Create coordinate grids (equivalent to MATLAB's ndgrid)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
         yy_v = repeat(Measures_y', length(Measures_x), 1)
@@ -164,34 +166,34 @@ x_coords = result.x
 y_coords = result.y
 ```
 """
-function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subset=nothing)
-    ArchGDAL.read(filename) do dataset
+function geotiff_read_axis_only(filename::String; pixel_subset = nothing, map_subset = nothing)
+    return ArchGDAL.read(filename) do dataset
         # Get basic image info
         width = ArchGDAL.width(dataset)
         height = ArchGDAL.height(dataset)
         bands = ArchGDAL.nraster(dataset)
-        
+
         # Get geotransform information using GDAL standard
         gt = ArchGDAL.getgeotransform(dataset)
-        
+
         geotransform = (
             x_origin = gt[1],
-            pixel_width = gt[2], 
+            pixel_width = gt[2],
             y_origin = gt[4],
-            pixel_height = gt[6]
+            pixel_height = gt[6],
         )
-        
+
         # Calculate pixel width and height (x-direction resolution)
         dx = geotransform.pixel_width    # pixel width (x-direction resolution)
         dy = -geotransform.pixel_height  # pixel height (make positive, GDAL uses negative for north-up)
         mapx = geotransform.x_origin     # x-coordinate of upper-left corner
-        mapy = geotransform.y_origin     # y-coordinate of upper-left corner  
-        
-        x_full = [mapx + (i-1) * dx for i in 1:width]
-        y_full = [mapy - (i-1) * dy for i in 1:height]
-        
+        mapy = geotransform.y_origin     # y-coordinate of upper-left corner
+
+        x_full = [mapx + (i - 1) * dx for i in 1:width]
+        y_full = [mapy - (i - 1) * dy for i in 1:height]
+
         sub = [1, width, 1, height]  # default: full image
-        
+
         if pixel_subset !== nothing
             sub = pixel_subset
         elseif map_subset !== nothing
@@ -200,28 +202,28 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
             subx2 = round(Int, (map_subset[2] - mapx) / dx + 1)
             suby1 = round(Int, (mapy - map_subset[4]) / dy + 1)
             suby2 = round(Int, (mapy - map_subset[3]) / dy + 1)
-            
+
             # Clamp to valid ranges
             subx1 = clamp(subx1, 1, width)
             subx2 = clamp(subx2, 1, width)
             suby1 = clamp(suby1, 1, height)
             suby2 = clamp(suby2, 1, height)
-            
+
             sub = [subx1, subx2, suby1, suby2]
         end
-        
+
         # Extract subset coordinates
         x_coords = x_full[sub[1]:sub[2]]
         y_coords = y_full[sub[3]:sub[4]]
-        
+
         # Create map_info structure
         map_info = (
             dx = dx,
             dy = dy,
             mapx = mapx,
-            mapy = mapy
+            mapy = mapy,
         )
-        
+
         # Create subset info (if subsetting was applied)
         sub_info = nothing
         if pixel_subset !== nothing || map_subset !== nothing
@@ -229,21 +231,21 @@ function geotiff_read_axis_only(filename::String; pixel_subset=nothing, map_subs
                 samples = sub[2] - sub[1] + 1,
                 lines = sub[4] - sub[3] + 1,
                 mapx = [x_coords[1], x_coords[end]],
-                mapy = [y_coords[1], y_coords[end]], 
+                mapy = [y_coords[1], y_coords[end]],
                 pixx = [sub[1], sub[2]],
-                pixy = [sub[3], sub[4]]
+                pixy = [sub[3], sub[4]],
             )
         end
-        
+
         # Create complete info structure matching MATLAB output
         info = (
             samples = width,
             lines = height,
             bands = bands,
             map_info = map_info,
-            sub = sub_info
+            sub = sub_info,
         )
-        
+
         return (x = x_coords, y = y_coords, info = info)
     end
 end
@@ -257,7 +259,7 @@ Load dh/dt (elevation/thickness change) data from Smith et al. 2020 GeoTIFF file
 A `NamedTuple`: `(grnd_xx, grnd_yy, grnd_dhdt, flt_xx, flt_yy, flt_dhdt)`,
 or `nothing` if the files cannot be found.
 """
-function load_data(::SmithDhdt, smith_dir::String; grnd_file=nothing, flt_file=nothing)
+function load_data(::SmithDhdt, smith_dir::String; grnd_file = nothing, flt_file = nothing)
     # Helper function to load a single file
     function load_single_file(filename)
         dhdt_raw = ArchGDAL.read(filename) do dataset
@@ -281,37 +283,37 @@ function load_data(::SmithDhdt, smith_dir::String; grnd_file=nothing, flt_file=n
         else
             dhdt = dhdt_raw
         end
-        
+
         # Flip to match MATLAB behavior
-        dhdt_flipped = reverse(dhdt, dims=1)
+        dhdt_flipped = reverse(dhdt, dims = 1)
 
         return xx, yy, dhdt_flipped
     end
-    
+
     # Determine which files to load
     if grnd_file === nothing && flt_file === nothing
         # Load both from default directory
         grnd_file = joinpath(smith_dir, "ais_grounded.tif")
         flt_file = joinpath(smith_dir, "ais_floating.tif")
     end
-    
+
     # Load files
     if grnd_file !== nothing && flt_file !== nothing
         # Load both files
         if !isfile(grnd_file) || !isfile(flt_file)
             return nothing
         end
-        
+
         grnd_xx, grnd_yy, grnd_dhdt = load_single_file(grnd_file)
         flt_xx, flt_yy, flt_dhdt = load_single_file(flt_file)
-        
+
         return (
             grnd_xx = grnd_xx,
             grnd_yy = grnd_yy,
             grnd_dhdt = grnd_dhdt,
             flt_xx = flt_xx,
             flt_yy = flt_yy,
-            flt_dhdt = flt_dhdt
+            flt_dhdt = flt_dhdt,
         )
     elseif grnd_file !== nothing
         # Load only grounded file — store in grnd fields, zeros for flt
@@ -349,11 +351,11 @@ function load_data(::ArthernAccumulation, filename::String)
     content = read(filename, String)
     content = replace(content, "\r\n" => "\n")  # Convert Windows to Unix line endings
     content = replace(content, "\r" => "\n")    # Handle old Mac line endings
-    
+
     # Split into lines and skip header
     lines = split(content, '\n')
     data_lines = lines[22:end]  # Skip 21 header lines (1-indexed)
-    
+
     # Parse data - handle multiple spaces by splitting on whitespace
     aa_lat = Float64[]
     aa_lon = Float64[]
@@ -361,15 +363,15 @@ function load_data(::ArthernAccumulation, filename::String)
     aa_y = Float64[]
     aa_acc_raw = Float64[]
     aa_err = Float64[]
-    
+
     for line in data_lines
         stripped = strip(line)
         isempty(stripped) && continue
-        
+
         # Split on whitespace (handles multiple spaces)
         parts = split(stripped)
         length(parts) < 6 && continue
-        
+
         try
             push!(aa_lat, parse(Float64, parts[1]))
             push!(aa_lon, parse(Float64, parts[2]))
@@ -408,7 +410,7 @@ Load Zwally drainage basins from a MATLAB .mat file.
 A `NamedTuple`: `(xx, yy, basins)` — filtered to points where basins > 0.
 """
 function load_data(::ZwallyBasins, filename::String)
-    matopen(filename) do mat_file
+    return matopen(filename) do mat_file
         xx_zwally_full = read(mat_file, "xxZwallyBasins")
         yy_zwally_full = read(mat_file, "yyZwallyBasins")
         zwally_basins_full = read(mat_file, "ZwallyBasins")
@@ -434,7 +436,7 @@ Load Frank temperature data from a MATLAB .mat file.
 A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::BISICLESTemps, …)`.
 """
 function load_data(::FrankTemps, filename::String)
-    matopen(filename) do mat_file
+    return matopen(filename) do mat_file
         FranksTemps = read(mat_file, "FranksTemps")
         xxTemp = read(mat_file, "xxTemp")
         yyTemp = read(mat_file, "yyTemp")
@@ -467,17 +469,17 @@ function interpolate_to_grid(x, y, values, xi, yi)
     # Flatten target grid coordinates
     xi_flat = vec(xi)
     yi_flat = vec(yi)
-    
+
     # Build KDTree for efficient nearest neighbor search
     points = hcat(x, y)
     tree = KDTree(points')
-    
+
     # Find nearest neighbors for each target point
     indices, _ = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
-    
+
     # Extract values at nearest neighbors
     result_flat = [values[idx[1]] for idx in indices]
-    
+
     # Reshape to match target grid
     return reshape(result_flat, size(xi))
 end
@@ -506,7 +508,7 @@ vectors that can be passed straight to `interpolate_to_grid`.
 """
 function interpolate_temperature(::FrankTemps, temp_data, Gh)
     temps_raw = temp_data.temps
-    sigmas    = temp_data.sigma
+    sigmas = temp_data.sigma
 
     temperature = zeros(size(temps_raw, 1), Gh.nx, Gh.ny)
     for i in 1:size(temps_raw, 1)
@@ -527,7 +529,7 @@ before interpolation.
 """
 function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
     temps_raw = copy(temp_data.temps)       # copy so we can NaN-mask in place
-    sigmas    = temp_data.sigma
+    sigmas = temp_data.sigma
 
     bisicles_yy = repeat(temp_data.yy, 1, length(temp_data.xx))
     bisicles_xx = repeat(temp_data.xx', length(temp_data.yy), 1)
@@ -535,13 +537,13 @@ function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
     temperature = zeros(length(sigmas), Gh.nx, Gh.ny)
 
     for i in 1:length(sigmas)
-        ocean_mask = temps_raw[i, :, :] .> 273.1480
+        ocean_mask = temps_raw[i, :, :] .> 273.148
         temps_raw[i, ocean_mask] .= NaN
 
-        this_temp  = temps_raw[i, :, :]
+        this_temp = temps_raw[i, :, :]
         valid_mask = .!isnan.(this_temp)
-        xx_valid   = bisicles_xx[valid_mask]
-        yy_valid   = bisicles_yy[valid_mask]
+        xx_valid = bisicles_xx[valid_mask]
+        yy_valid = bisicles_yy[valid_mask]
         temp_valid = this_temp[valid_mask]
 
         temperature[i, :, :] = interpolate_to_grid(xx_valid, yy_valid, temp_valid, Gh.xx, Gh.yy)

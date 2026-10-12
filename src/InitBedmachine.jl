@@ -25,23 +25,23 @@ Tuple of grid structures (Gh, Gu, Gv, Gc) with loaded data
 """
 function init_bedmachine(params)
     bed_source = get(params, :bed_source, BedMachineV3())
-    bed_file   = get(params, :bed_file, default_path(BedMachineV3()))
+    bed_file = get(params, :bed_file, default_path(BedMachineV3()))
 
     bm = load_data(bed_source, bed_file)
-    bed       = bm.bed
-    x         = bm.x
-    y         = bm.y
-    geoid     = bm.geoid
-    mask      = bm.mask
-    h         = bm.thickness
-    s         = bm.surface
+    bed = bm.bed
+    x = bm.x
+    y = bm.y
+    geoid = bm.geoid
+    mask = bm.mask
+    h = bm.thickness
+    s = bm.surface
 
     # Flip arrays for correct orientation
-    bed   = reverse(bed, dims=1)
-    geoid = reverse(geoid, dims=1)
-    mask  = reverse(mask, dims=1)
-    s     = reverse(s, dims=1)
-    h     = reverse(h, dims=1)
+    bed = reverse(bed, dims = 1)
+    geoid = reverse(geoid, dims = 1)
+    mask = reverse(mask, dims = 1)
+    s = reverse(s, dims = 1)
+    h = reverse(h, dims = 1)
 
     # Create rock mask (mask=1 in BedMachine v3 indicates rock
     rockmask = zeros(size(mask))
@@ -55,8 +55,8 @@ function init_bedmachine(params)
     dx_full = 500
     dy_full = 500
 
-    x_full = x0_full .+ (0.5:(nx_full-0.5)) .* dx_full
-    y_full = y0_full .+ (0.5:(ny_full-0.5)) .* dy_full
+    x_full = x0_full .+ (0.5:(nx_full - 0.5)) .* dx_full
+    y_full = y0_full .+ (0.5:(ny_full - 0.5)) .* dy_full
 
     i_pole = floor(Int, -x0_full / dx_full + 0.5)
     j_pole = floor(Int, -y0_full / dy_full + 0.5)
@@ -71,8 +71,8 @@ function init_bedmachine(params)
     domain_half_width = 2819  # Half-width in grid points
     domain_half_height = 2419  # Half-height in grid points
 
-    isub = i_pole .+ 2*sub_samp .* (-floor(Int, (domain_half_width*2)/(2*sub_samp)):floor(Int, (domain_half_width*2)/(2*sub_samp)))
-    jsub = j_pole .+ 2*sub_samp .* (-floor(Int, (domain_half_height*2)/(2*sub_samp)):floor(Int, (domain_half_height*2)/(2*sub_samp)))
+    isub = i_pole .+ 2 * sub_samp .* (-floor(Int, (domain_half_width * 2) / (2 * sub_samp)):floor(Int, (domain_half_width * 2) / (2 * sub_samp)))
+    jsub = j_pole .+ 2 * sub_samp .* (-floor(Int, (domain_half_height * 2) / (2 * sub_samp)):floor(Int, (domain_half_height * 2) / (2 * sub_samp)))
 
     # Subsample all arrays
     bed = bed[isub, jsub]
@@ -88,74 +88,80 @@ function init_bedmachine(params)
     # Create H-grid structure
     Gh = create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
     Gh = load_additional_datasets(Gh, params)
-    
+
     # Calculate height above floatation and grounded ice mask
     density_ice = get(params, :density_ice, 918.0)
     density_ocean = get(params, :density_ocean, 1028.0)
     min_thick = get(params, :min_thick, 50.0)
-    
+
     # Calculate hAF first
     hAF = Gh.h .+ (density_ocean / density_ice) .* Gh.b
     aground = (hAF .>= 0) .& .!Gh.rockmask .& (mask .!= 4)
-    
-    Gh = merge(Gh, (
-        hAF = hAF,
-        aground = aground,
-        surfType = zeros(size(mask))
-    ))
-    
+
+    Gh = merge(
+        Gh, (
+            hAF = hAF,
+            aground = aground,
+            surfType = zeros(size(mask)),
+        )
+    )
+
     # Set surfType based on aground mask
     surfType_calc = (Gh.aground .* 1) .+ ((.!Gh.aground .& (Gh.h .> 0.0)) .* 2) .+ (Gh.rockmask .* 3)
     Gh = merge(Gh, (surfType = surfType_calc,))
-    
+
     # Recalculate ice and rock with updated surfType
-    Gh = merge(Gh, (
-        ice = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2)),
-        rock = (Gh.surfType .== 3) .| (Gh.aground .& (Gh.h .< min_thick)),
-        ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2))
-    ))
-    
+    Gh = merge(
+        Gh, (
+            ice = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2)),
+            rock = (Gh.surfType .== 3) .| (Gh.aground .& (Gh.h .< min_thick)),
+            ok = (Gh.h .> min_thick) .& ((Gh.surfType .== 1) .| (Gh.surfType .== 2)),
+        )
+    )
+
     # Load dhdt data via dispatch
     dhdt_source = get(params, :dhdt_source, SmithDhdt())
-    dhdt_file   = get(params, :dhdt_file, default_path(SmithDhdt()))
-    smith_data  = load_data(dhdt_source, dhdt_file)
+    dhdt_file = get(params, :dhdt_file, default_path(SmithDhdt()))
+    smith_data = load_data(dhdt_source, dhdt_file)
 
     if smith_data !== nothing
         # Interpolate grounded data
         fdhdt_grnd = .!isnan.(smith_data.grnd_dhdt)
         dhdt_grnd = interpolate_to_grid(
-            smith_data.grnd_xx[fdhdt_grnd][:], 
-            smith_data.grnd_yy[fdhdt_grnd][:], 
-            smith_data.grnd_dhdt[fdhdt_grnd][:], 
+            smith_data.grnd_xx[fdhdt_grnd][:],
+            smith_data.grnd_yy[fdhdt_grnd][:],
+            smith_data.grnd_dhdt[fdhdt_grnd][:],
             Gh.xx, Gh.yy
         )
-        
+
         # Interpolate floating data
         fdhdt_flt = .!isnan.(smith_data.flt_dhdt)
         dhdt_flt = interpolate_to_grid(
-            smith_data.flt_xx[fdhdt_flt][:], 
-            smith_data.flt_yy[fdhdt_flt][:], 
-            smith_data.flt_dhdt[fdhdt_flt][:], 
+            smith_data.flt_xx[fdhdt_flt][:],
+            smith_data.flt_yy[fdhdt_flt][:],
+            smith_data.flt_dhdt[fdhdt_flt][:],
             Gh.xx, Gh.yy
         )
-        
+
         # Combine based on surfType: floating (2) uses flt, grounded (1 or 4) uses grnd
         dhdt = zeros(size(Gh.surfType))
         dhdt[Gh.surfType .== 2] .= dhdt_flt[Gh.surfType .== 2]
         dhdt[(Gh.surfType .== 1) .| (Gh.surfType .== 4)] .= dhdt_grnd[(Gh.surfType .== 1) .| (Gh.surfType .== 4)]
-        
+
         Gh = merge(Gh, (dhdt = dhdt,))
     else
         # NoData or files not found — use zeros
         Gh = merge(Gh, (dhdt = zeros(size(Gh.surfType)),))
     end
-    
+
     # Add aliases for compatibility with SelectDomainWAVI
-    Gh = merge(Gh, (
-        basinID = Gh.basin_id,
-        a = Gh.a_Arthern,
-        rock = Gh.rockmask
-    ))
+    Gh = merge(
+        Gh, (
+            basinID = Gh.basin_id,
+            a = Gh.a_Arthern,
+            rock = Gh.rockmask,
+        )
+    )
 
     # Create U/V/C grids
     Gu = create_u_grid(Gh)
@@ -188,7 +194,7 @@ function create_h_grid(x, y, bed, h, s, geoid, rockmask, mask, params)
         h = h,
         s = s,
         mask = mask .> 0,  # Convert to boolean
-        rockmask = rockmask .> 0
+        rockmask = rockmask .> 0,
     )
 
     # Create coordinate grids
@@ -205,8 +211,8 @@ Load accumulation, basin, and surface temperature data via dispatch on source ty
 function load_additional_datasets(Gh, params)
     # ── Accumulation ──────────────────────────────────────────────────
     acc_source = get(params, :accumulation_source, ArthernAccumulation())
-    acc_file   = get(params, :accumulation_file, default_path(ArthernAccumulation()))
-    acc_data   = load_data(acc_source, acc_file)
+    acc_file = get(params, :accumulation_file, default_path(ArthernAccumulation()))
+    acc_data = load_data(acc_source, acc_file)
 
     if acc_data !== nothing
         Gh = merge(Gh, (a_Arthern = interpolate_to_grid(acc_data.x, acc_data.y, acc_data.acc, Gh.xx, Gh.yy),))
@@ -217,8 +223,8 @@ function load_additional_datasets(Gh, params)
 
     # ── Drainage basins ───────────────────────────────────────────────
     basins_source = get(params, :basins_source, ZwallyBasins())
-    basins_file   = get(params, :basins_file, default_path(ZwallyBasins()))
-    basins_data   = load_data(basins_source, basins_file)
+    basins_file = get(params, :basins_file, default_path(ZwallyBasins()))
+    basins_data = load_data(basins_source, basins_file)
 
     if basins_data !== nothing
         Gh = merge(Gh, (basin_id = interpolate_to_grid(basins_data.xx, basins_data.yy, basins_data.basins, Gh.xx, Gh.yy),))
@@ -229,7 +235,7 @@ function load_additional_datasets(Gh, params)
 
     # ── Surface temperature / mean-annual temperature (ALBMAP) ────────
     geom_source = get(params, :surface_temp_source, ALBMAPv1())
-    geom_file   = get(params, :surface_temp_file, default_path(ALBMAPv1()))
+    geom_file = get(params, :surface_temp_file, default_path(ALBMAPv1()))
 
     if geom_source isa NoData
         error("Surface temperature source (e.g. ALBMAP) is required and cannot be NoData.")
@@ -254,8 +260,8 @@ function create_u_grid(Gh)
         dy = Gh.dy,
         nx = Gh.nx + 1,
         ny = Gh.ny,
-        xx = [Gh.x0 + (i-1)*Gh.dx for i in 1:(Gh.nx+1), j in 1:Gh.ny],
-        yy = [Gh.y0 + (j-0.5)*Gh.dy for i in 1:(Gh.nx+1), j in 1:Gh.ny]
+        xx = [Gh.x0 + (i - 1) * Gh.dx for i in 1:(Gh.nx + 1), j in 1:Gh.ny],
+        yy = [Gh.y0 + (j - 0.5) * Gh.dy for i in 1:(Gh.nx + 1), j in 1:Gh.ny],
     )
     return Gu
 end
@@ -273,8 +279,8 @@ function create_v_grid(Gh)
         dy = Gh.dy,
         nx = Gh.nx,
         ny = Gh.ny + 1,
-        xx = [Gh.x0 + (i-0.5)*Gh.dx for i in 1:Gh.nx, j in 1:(Gh.ny+1)],
-        yy = [Gh.y0 + (j-1)*Gh.dy for i in 1:Gh.nx, j in 1:(Gh.ny+1)]
+        xx = [Gh.x0 + (i - 0.5) * Gh.dx for i in 1:Gh.nx, j in 1:(Gh.ny + 1)],
+        yy = [Gh.y0 + (j - 1) * Gh.dy for i in 1:Gh.nx, j in 1:(Gh.ny + 1)],
     )
     return Gv
 end
@@ -292,8 +298,8 @@ function create_c_grid(Gh)
         dy = Gh.dy,
         nx = Gh.nx - 1,
         ny = Gh.ny - 1,
-        xx = [Gh.x0 + i*Gh.dx for i in 1:(Gh.nx-1), j in 1:(Gh.ny-1)],
-        yy = [Gh.y0 + j*Gh.dy for i in 1:(Gh.nx-1), j in 1:(Gh.ny-1)]
+        xx = [Gh.x0 + i * Gh.dx for i in 1:(Gh.nx - 1), j in 1:(Gh.ny - 1)],
+        yy = [Gh.y0 + j * Gh.dy for i in 1:(Gh.nx - 1), j in 1:(Gh.ny - 1)],
     )
     return Gc
 end
@@ -307,14 +313,14 @@ function load_velocity_data(Gu, Gv, Gh, params)
     sub_samp = get(params, :sub_samp, 8)
 
     vel_source = get(params, :velocity_source, MEaSUREs())
-    vel_file   = get(params, :velocity_file, default_path(MEaSUREs()))
-    vel_data   = load_data(vel_source, vel_file)
+    vel_file = get(params, :velocity_file, default_path(MEaSUREs()))
+    vel_data = load_data(vel_source, vel_file)
 
     if vel_data !== nothing
         xx_v = vel_data.xx
         yy_v = vel_data.yy
-        vx   = vel_data.vx
-        vy   = vel_data.vy
+        vx = vel_data.vx
+        vy = vel_data.vy
     else
         @warn "Velocity data skipped (source: $(typeof(vel_source))). Using zeros."
         xx_v = Gh.xx
@@ -338,20 +344,24 @@ function load_velocity_data(Gu, Gv, Gh, params)
 
     u_data = interpolate_to_grid(xx_v[:], yy_v[:], vx[:], Gu.xx, Gu.yy)
     v_data = interpolate_to_grid(xx_v[:], yy_v[:], vy[:], Gv.xx, Gv.yy)
-    
-    Gu = merge(Gu, (
-        u_data = u_data,
-        u_data_mask = .!isnan.(u_data),
-        uData = u_data,  # Alias for compatibility
-        uDataMask = .!isnan.(u_data)
-    ))
 
-    Gv = merge(Gv, (
-        v_data = v_data,
-        v_data_mask = .!isnan.(v_data),
-        vData = v_data,  # Alias for compatibility
-        vDataMask = .!isnan.(v_data)
-    ))
+    Gu = merge(
+        Gu, (
+            u_data = u_data,
+            u_data_mask = .!isnan.(u_data),
+            uData = u_data,  # Alias for compatibility
+            uDataMask = .!isnan.(u_data),
+        )
+    )
+
+    Gv = merge(
+        Gv, (
+            v_data = v_data,
+            v_data_mask = .!isnan.(v_data),
+            vData = v_data,  # Alias for compatibility
+            vDataMask = .!isnan.(v_data),
+        )
+    )
 
     return Gu, Gv
 end
@@ -370,7 +380,7 @@ this orchestrator never needs to change.
 """
 function load_temperature_data(Gh, params)
     temp_source = get(params, :temperature_source, FrankTemps())
-    temp_file   = get(params, :temperature_file, default_path(FrankTemps()))
+    temp_file = get(params, :temperature_file, default_path(FrankTemps()))
 
     if temp_source isa NoData
         error("Temperature source is required and cannot be NoData.")
