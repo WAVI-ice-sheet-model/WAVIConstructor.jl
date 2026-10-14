@@ -204,6 +204,7 @@ function setup_wavi_data(params; output_path = "outputs", edge = 3, output_forma
     )
 
     # Create full velocity masks (both data and mask)
+    # MATLAB: uDataMask = (uData != 0) & Gu.mask  — velocity data AND ice mask
     Gu = merge(
         Gu, (
             uDataMaskFull_clip = Gu.uDataMask_clip .& Gu.mask_clip,
@@ -268,7 +269,7 @@ function replace_nans_in_clipped_data(Gh)
         end
     end
 
-    for field in [:h_clip, :s_clip, :b_clip, :a_clip, :dhdt_clip, :a_Arthern_clip]
+    for field in [:h_clip, :s_clip, :b_clip, :dhdt_clip, :a_Arthern_clip]
         if haskey(Gh, field)
             data = getproperty(Gh, field)
             nan_mask = isnan.(data) .& .!Gh.mask_clip

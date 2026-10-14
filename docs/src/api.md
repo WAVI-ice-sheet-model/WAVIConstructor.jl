@@ -77,6 +77,7 @@ Each source singleton selects the appropriate method.
 ```@docs
 WAVIConstructor.DataLoading.load_data
 WAVIConstructor.DataLoading.interpolate_to_grid
+WAVIConstructor.DataLoading.interpolate_regular_grid_nearest
 WAVIConstructor.DataLoading.interpolate_temperature
 WAVIConstructor.DataLoading.geotiff_read_axis_only
 ```
