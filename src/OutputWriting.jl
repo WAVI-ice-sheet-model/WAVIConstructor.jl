@@ -159,7 +159,6 @@ function write_netcdf_file(
     end
 
 
-
     # ── Determine dimensions ──────────────────────────────────────────
     nx_h, ny_h = Gh.nx_clip, Gh.ny_clip
 
@@ -328,10 +327,11 @@ Write WAVI model input data in the requested format.
 - `nc_filename`: Name of the NetCDF file (default `"wavi_input.nc"`).
 
 """
-function write_output(Gh, Gu, Gv, output_path;
-                      format::Symbol = :bin,
-                      nc_filename::String = "wavi_input.nc",
-)
+function write_output(
+        Gh, Gu, Gv, output_path;
+        format::Symbol = :bin,
+        nc_filename::String = "wavi_input.nc",
+    )
     if format ∉ (:bin, :netcdf, :both)
         error("Unknown output format :$format — expected :bin, :netcdf, or :both")
     end

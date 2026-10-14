@@ -105,7 +105,7 @@ matching MATLAB's `bisicles_x = 1000 * ncread(fname_start, 'x')`.
 # Returns
 A `NamedTuple`: `(temps, xx, yy, sigma)` — same shape as `load_data(::FrankTemps, …)`.
 """
-function load_data(::BISICLESTemps, filename::String; scale_xy::Real=1000)
+function load_data(::BISICLESTemps, filename::String; scale_xy::Real = 1000)
     ds = NCDataset(filename)
     try
         bisicles_sigma = vec(Array(ds["sigma"]))
@@ -146,8 +146,10 @@ function load_data(::MEaSUREs, filename::String)
         xx_v = repeat(Measures_x, 1, length(Measures_y))
         yy_v = repeat(Measures_y', length(Measures_x), 1)
 
-        return (xx = xx_v, yy = yy_v, vx = VX, vy = VY,
-                x = Measures_x, y = Measures_y)
+        return (
+            xx = xx_v, yy = yy_v, vx = VX, vy = VY,
+            x = Measures_x, y = Measures_y,
+        )
     finally
         close(ds)
     end
@@ -477,8 +479,10 @@ target points, using MATLAB-compatible round-half-up tie-breaking to match
 Target points outside the source bounding box receive `NaN`,
 matching MATLAB's convex-hull-extrapolation behaviour.
 """
-function interpolate_regular_grid_nearest(xs::AbstractVector, ys::AbstractVector,
-                                           values::AbstractMatrix, xi, yi)
+function interpolate_regular_grid_nearest(
+        xs::AbstractVector, ys::AbstractVector,
+        values::AbstractMatrix, xi, yi
+    )
     dx_s = xs[2] - xs[1]   # source spacing (signed)
     dy_s = ys[2] - ys[1]
     nx_s = length(xs)
@@ -515,7 +519,7 @@ Equivalent to MATLAB's TriScatteredInterp / scatteredInterpolant with 'nearest'.
 
 - `max_dist`: target points farther than this from any source point receive `NaN`.
 """
-function interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
+function interpolate_to_grid(x, y, values, xi, yi; max_dist = Inf)
     # Flatten target grid coordinates
     xi_flat = vec(xi)
     yi_flat = vec(yi)
@@ -526,21 +530,23 @@ function interpolate_to_grid(x, y, values, xi, yi; max_dist=Inf)
     if !any(valid)
         return fill(NaN, size(xi))
     end
-    x_v      = x[valid]
-    y_v      = y[valid]
+    x_v = x[valid]
+    y_v = y[valid]
     values_v = values[valid]
 
     # Build KDTree for efficient nearest neighbor search
     points = hcat(x_v, y_v)
     tree = KDTree(points')
-    
+
     # Find nearest neighbors and distances for each target point
     indices, dists = knn(tree, hcat(xi_flat, yi_flat)', 1, true)
-    
+
     # Extract values at nearest neighbors; mask out points beyond max_dist
-    result_flat = [dists[i][1] <= max_dist ? values_v[indices[i][1]] : NaN
-                   for i in eachindex(indices)]
-    
+    result_flat = [
+        dists[i][1] <= max_dist ? values_v[indices[i][1]] : NaN
+            for i in eachindex(indices)
+    ]
+
     # Reshape to match target grid
     return reshape(result_flat, size(xi))
 end
@@ -597,7 +603,7 @@ default `max_dist = Inf` reproduces this exactly.
 """
 function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
     temps_raw = temp_data.temps
-    sigmas    = temp_data.sigma
+    sigmas = temp_data.sigma
 
     bisicles_x = temp_data.xx
     bisicles_y = temp_data.yy
@@ -610,7 +616,7 @@ function interpolate_temperature(::BISICLESTemps, temp_data, Gh)
     for i in 1:length(sigmas)
         # Per-level ocean masking (matches MATLAB: this_temp(this_temp>273.148)=NaN)
         this_temp = temps_raw[i, :, :]
-        this_temp[this_temp .> 273.1480] .= NaN
+        this_temp[this_temp .> 273.148] .= NaN
 
         valid_mask = .!isnan.(this_temp)
         xx_valid = bisicles_xx[valid_mask]

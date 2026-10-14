@@ -39,12 +39,12 @@ function init_bedmachine(params)
     # Flip arrays to match MATLAB's fliplr (reverse along dimension 2 = columns/y-axis).
     # BedMachine v3 stores y in descending order; flip y too so the coordinate
     # vector stays consistent with the flipped data arrays (ascending y).
-    bed   = reverse(bed, dims=2)
-    geoid = reverse(geoid, dims=2)
-    mask  = reverse(mask, dims=2)
-    s     = reverse(s, dims=2)
-    h     = reverse(h, dims=2)
-    y     = reverse(y)
+    bed = reverse(bed, dims = 2)
+    geoid = reverse(geoid, dims = 2)
+    mask = reverse(mask, dims = 2)
+    s = reverse(s, dims = 2)
+    h = reverse(h, dims = 2)
+    y = reverse(y)
 
     # Create rock mask (mask=1 in BedMachine v3 indicates rock
     rockmask = zeros(size(mask))
@@ -160,11 +160,13 @@ function init_bedmachine(params)
     # Add aliases for compatibility with SelectDomainWAVI
     # Gh.rock must match MATLAB: (surfType==3) | (grounded & h < min_thick)
     # NOT just rockmask (BedMachine mask==1), which omits thin grounded ice cells.
-    Gh = merge(Gh, (
-        basinID = Gh.basin_id,
-        a = Gh.a_Arthern,
-        rock = Gh.rock   # already set above as (surfType==3)|(aground & h<min_thick)
-    ))
+    Gh = merge(
+        Gh, (
+            basinID = Gh.basin_id,
+            a = Gh.a_Arthern,
+            rock = Gh.rock,   # already set above as (surfType==3)|(aground & h<min_thick)
+        )
+    )
 
     # Create U/V/C grids
     Gu = create_u_grid(Gh)
@@ -320,13 +322,13 @@ function load_velocity_data(Gu, Gv, Gh, params)
     vel_data = load_data(vel_source, vel_file)
 
     if vel_data !== nothing
-        vx   = vel_data.vx
-        vy   = vel_data.vy
+        vx = vel_data.vx
+        vy = vel_data.vy
 
         # Subsampled 1-D coordinate axes and 2-D value arrays
         step = sub_samp < 1.0 ? 1 : sub_samp
-        xs  = vel_data.x[1:step:end]
-        ys  = vel_data.y[1:step:end]
+        xs = vel_data.x[1:step:end]
+        ys = vel_data.y[1:step:end]
         vx_sub = vx[1:step:end, 1:step:end]
         vy_sub = vy[1:step:end, 1:step:end]
 
@@ -344,15 +346,19 @@ function load_velocity_data(Gu, Gv, Gh, params)
         v_data = zeros(size(Gv.xx))
     end
 
-    Gu = merge(Gu, (
-        uData = u_data,
-        uDataMask = .!isnan.(u_data) .& (u_data .!= 0.0)
-    ))
+    Gu = merge(
+        Gu, (
+            uData = u_data,
+            uDataMask = .!isnan.(u_data) .& (u_data .!= 0.0),
+        )
+    )
 
-    Gv = merge(Gv, (
-        vData = v_data,
-        vDataMask = .!isnan.(v_data) .& (v_data .!= 0.0)
-    ))
+    Gv = merge(
+        Gv, (
+            vData = v_data,
+            vDataMask = .!isnan.(v_data) .& (v_data .!= 0.0),
+        )
+    )
 
     return Gu, Gv
 end

@@ -87,8 +87,8 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     gu_size = size(Gu.xx)
     gv_size = size(Gv.xx)
     gh_mask_size = size(Gh_mask)
-    
-    # For U-grid: should match size of Gu.xx 
+
+    # For U-grid: should match size of Gu.xx
     # MATLAB conv2([1;1], 1, A) for (nx,ny) input gives (nx+1,ny):
     #   row 1     = A[1,:]
     #   row i     = A[i-1,:] | A[i,:]   for 2 ≤ i ≤ nx
@@ -96,7 +96,7 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     if gu_size[1] == gh_mask_size[1] + 1 && gu_size[2] == gh_mask_size[2]
         Gu_mask = [
             Gh_mask[1:1, :];
-            Gh_mask[1:end-1, :] .| Gh_mask[2:end, :];
+            Gh_mask[1:(end - 1), :] .| Gh_mask[2:end, :];
             Gh_mask[end:end, :]
         ]
     else
@@ -113,7 +113,7 @@ function select_domain_wavi(Gh, Gu, Gv, Gc, params)
     if gv_size[1] == gh_mask_size[1] && gv_size[2] == gh_mask_size[2] + 1
         Gv_mask = hcat(
             Gh_mask[:, 1:1],
-            Gh_mask[:, 1:end-1] .| Gh_mask[:, 2:end],
+            Gh_mask[:, 1:(end - 1)] .| Gh_mask[:, 2:end],
             Gh_mask[:, end:end]
         )
     else

@@ -205,13 +205,17 @@ function setup_wavi_data(params; output_path = "outputs", edge = 3, output_forma
 
     # Create full velocity masks (both data and mask)
     # MATLAB: uDataMask = (uData != 0) & Gu.mask  — velocity data AND ice mask
-    Gu = merge(Gu, (
-        uDataMaskFull_clip = Gu.uDataMask_clip .& Gu.mask_clip,
-    ))
-    Gv = merge(Gv, (
-        vDataMaskFull_clip = Gv.vDataMask_clip .& Gv.mask_clip,
-    ))
-    
+    Gu = merge(
+        Gu, (
+            uDataMaskFull_clip = Gu.uDataMask_clip .& Gu.mask_clip,
+        )
+    )
+    Gv = merge(
+        Gv, (
+            vDataMaskFull_clip = Gv.vDataMask_clip .& Gv.mask_clip,
+        )
+    )
+
     # Extrapolate temperature to include surface (sigma=0) and base (sigma=1)
     Gh = extrapolate_temperature(Gh, I_clip_min, I_clip_max, J_clip_min, J_clip_max)
 
@@ -264,7 +268,7 @@ function replace_nans_in_clipped_data(Gh)
             updates[:basinID_clip] = data_new
         end
     end
-    
+
     for field in [:h_clip, :s_clip, :b_clip, :dhdt_clip, :a_Arthern_clip]
         if haskey(Gh, field)
             data = getproperty(Gh, field)
