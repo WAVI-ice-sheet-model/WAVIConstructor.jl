@@ -5,7 +5,6 @@ using WAVIConstructor
 Revise.revise()
 include("make.jl")
 servedocs(
-    foldername="./docs",
-    include_dirs=["./src/"]
+    foldername = "./docs",
+    include_dirs = ["./src/"]
 )
- 

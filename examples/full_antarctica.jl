@@ -63,12 +63,12 @@ params = default_constructor_params(
     clip_edge_padding = 3,
 
     # ── Physical constants (MATLAB DefaultParamsWAVI) ─────────────────
-    density_ice   = 918.0,   # kg/m³
+    density_ice = 918.0,   # kg/m³
     density_ocean = 1028.0,  # kg/m³
-    min_thick     = 50.0,    # m — ice thinner than this is masked out
+    min_thick = 50.0,    # m — ice thinner than this is masked out
 
     # ── Output ────────────────────────────────────────────────────────
-    output_path   = "outputs/full_antarctica",
+    output_path = "outputs/full_antarctica",
     output_format = :both,   # write both .bin and .nc files
 )
 
@@ -84,14 +84,14 @@ params = default_constructor_params(
 println("Running full Antarctica setup (8 km, basins 1:27)...")
 println("This may take a while — loading and interpolating multiple datasets.\n")
 
-Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path="outputs/full_antarctica")
+Gh, Gu, Gv, Gc = setup_wavi_data(params; output_path = "outputs/full_antarctica")
 
 # ──────────────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────────────
-println("\n", "=" ^ 60)
+println("\n", "="^60)
 println("Full Antarctica Setup — Summary")
-println("=" ^ 60)
+println("="^60)
 
 println("\nGrid Configuration:")
 println("  Grid spacing:     $(Gh.dx) m ($(Gh.dx / 1000) km)")
@@ -106,7 +106,7 @@ println("\nIce Statistics:")
 println("  H-grid ice pts:   $(Gh.n_clip)")
 
 println("\nPhysical Parameters (from MATLAB DefaultParamsWAVI):")
-density_ice   = 918.0
+density_ice = 918.0
 density_ocean = 1028.0
 delta = 1 - density_ice / density_ocean
 println("  density_ice:       $density_ice kg/m³")

@@ -212,7 +212,8 @@ Users can then write `temperature = MyNewSource()` and the auto-wrapping handles
 TBC
 
 ## Contributing
-TBC
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on development, testing, code style, adding new datasets, and the pull request workflow.
 
 ## License
 This software is licensed under an MIT license.
