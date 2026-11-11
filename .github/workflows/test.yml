@@ -19,7 +19,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.julia-version == 'pre' }}
     strategy:
       fail-fast: false
       matrix:
