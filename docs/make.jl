@@ -13,3 +13,8 @@ makedocs(
     # Internal helper functions with docstrings are optional
     checkdocs = :exports,
 )
+
+deploydocs(
+    repo = "github.com/WAVI-ice-sheet-model/WAVIConstructor.jl.git",
+    devbranch = "main",
+)

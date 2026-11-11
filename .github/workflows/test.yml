@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        julia-version: ['1.11', '1.12']
+        # '1' tracks the latest stable Julia release
+        julia-version: ['1.11', '1.12', '1']
 
     steps:
       - uses: actions/checkout@v4

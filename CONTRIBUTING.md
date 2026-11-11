@@ -133,7 +133,8 @@ No changes to other files are needed. The dispatch system will pick up your new 
 - **Versioning:**
   - Follows [SemVer](https://semver.org/). Bump version in `Project.toml` for breaking changes, features, or fixes.
 - **Releases:**
-  - Tag a release on GitHub. CI will build docs and run tests.
+  - Update `CHANGELOG.md`, and the `version` and `date-released` in `CITATION.cff`, in a PR to `main`.
+  - After merging, tag `vX.Y.Z` on `main` and create a GitHub release. The tag triggers the docs workflow.
 
 ## Questions?
 

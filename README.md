@@ -9,15 +9,15 @@
 
 Pre-processing library for [WAVI.jl](https://github.com/WAVI-ice-sheet-model/WAVI.jl).
 
-This package is a WIP, but will support the reading and pre-processing of input data, and preparing a WAVI domain for inversion runs.
+This package reads and pre-processes input data, and prepares a WAVI domain for inversion runs. It is in early development (v0.x), so the API may change between releases.
 
 ## Installation
 
-You can install the latest version of `WAVIConstructor` using Julia's in-built package manager:
+`WAVIConstructor` is not in the Julia General registry. Install release v0.1.0 (requires Julia 1.11 or newer) using Julia's in-built package manager:
 
 ```julia
 using Pkg
-Pkg.add(PackageSpec(url="https://github.com/WAVI-ice-sheet-model/WAVIConstructor.jl.git", rev = "main"))
+Pkg.add(PackageSpec(url="https://github.com/WAVI-ice-sheet-model/WAVIConstructor.jl.git", rev = "v0.1.0"))
 ```
 
 ## Usage
@@ -220,5 +220,5 @@ This software is licensed under an MIT license.
 
 For more information please see the attached `LICENSE` file.
 
-## Developers
-WAVI.jl Ice Sheet Model Team, British Antarctic Survey
+## Citing
+See [CITATION.cff](CITATION.cff).

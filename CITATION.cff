@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "WAVIConstructor.jl"
+abstract: "Pre-processing library for WAVI.jl: reads and interpolates geophysical datasets, selects a regional domain, and writes WAVI inversion input files."
+version: 0.1.0
+date-released: "YYYY-MM-DD" # TODO: release date
+license: MIT
+repository-code: "https://github.com/WAVI-ice-sheet-model/WAVIConstructor.jl"
+url: "https://WAVI-ice-sheet-model.github.io/WAVIConstructor.jl/"
+authors:
+  - family-names: "Zwagerman"
+    given-names: "Thomas"
+    orcid: "https://orcid.org/0009-0003-3742-3234"
+    affiliation: "British Antarctic Survey"
+  - family-names: "Grunau"
+    given-names: "Sophie"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+    affiliation: "British Antarctic Survey"
+keywords:
+  - ice sheet modelling
+  - Antarctica
+  - Greenland
+  - WAVI
+  - pre-processing
