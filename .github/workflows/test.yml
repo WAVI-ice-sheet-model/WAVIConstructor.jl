@@ -20,7 +20,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         # '1' tracks the latest stable Julia release
         julia-version: ['1.11', '1.12', '1']
